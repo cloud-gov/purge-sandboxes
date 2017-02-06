@@ -15,6 +15,20 @@ jobs:
       ORG_NAME: {{notify-org-name}}
       SERVICE_NAMES: {{notify-service-names}}
 
+- name: purge-sandboxes
+  plan:
+  - aggregate:
+    - get: sandbox-config
+    - get: purge-schedule
+      trigger: true
+  - task: purge
+    file: sandbox-config/purge.yml
+    params:
+      API_ADDRESS: {{purge-api-url}}
+      CLIENT_ID: {{purge-client-id}}
+      CLIENT_SECRET: {{purge-client-secret}}
+      ORG_NAME: {{purge-org-name}}
+
 resources:
 - name: sandbox-config
   type: git
@@ -27,6 +41,12 @@ resources:
   source:
     expression: {{notify-schedule-expression}}
     location: {{notify-schedule-location}}
+
+- name: purge-schedule
+  type: cron-resource
+  source:
+    expression: {{purge-schedule-expression}}
+    location: {{purge-schedule-location}}
 
 resource_types:
 - name: cron-resource
