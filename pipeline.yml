@@ -1,0 +1,31 @@
+---
+jobs:
+- name: notify-sandbox-users
+  plan:
+  - aggregate:
+    - get: sandbox-config
+    - get: notify-schedule
+      trigger: true
+  file: sandbox-config/notify.yml
+  params:
+    API_ADDRESS: {{notify-api-url}}
+    CLIENT_ID: {{notify-client-id}}
+    CLIENT_SECRET: {{notify-client-secret}}
+    ORG_NAME: {{notify-org-guid}}
+    SERVICE_GUIDS: {{notify-service-guids}}
+
+resources:
+- name: sandbox-config
+  type: git
+
+- name: notify-schedule
+  type: cron-resource
+  source:
+    expression: {{notify-schedule-expression}}
+    location: {{notify-schedule-location}}
+
+resource_types:
+- name: cron-resource
+  type: docker-image
+  source:
+    repository: cftoolsmiths/cron-test
