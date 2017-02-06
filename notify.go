@@ -14,7 +14,20 @@ type Options struct {
 	ClientID     string   `envconfig:"client_id" required:"true"`
 	ClientSecret string   `envconfig:"client_secret" required:"true"`
 	OrgName      string   `envconfig:"org_name" required:"true"`
-	ServiceGUIDs []string `envconfig:"service_guids" required:"true"`
+	ServiceNames []string `envconfig:"service_names" required:"true"`
+}
+
+func getServiceByName(client *cfclient.Client, service string) (cfclient.Service, error) {
+	q := url.Values{}
+	q.Set("q", fmt.Sprintf("label:%s", service))
+	services, err := client.ListServicesByQuery(q)
+	if err != nil {
+		return cfclient.Service{}, err
+	}
+	if len(services) != 1 {
+		return cfclient.Service{}, fmt.Errorf("could not find service %s", service)
+	}
+	return services[0], nil
 }
 
 func listInstances(client *cfclient.Client, orgGUID string) ([]cfclient.ServiceInstance, error) {
@@ -38,6 +51,7 @@ func listSpaces(client *cfclient.Client, orgGUID string) (map[string]cfclient.Sp
 }
 
 func sendMail(instance cfclient.ServiceInstance, space cfclient.Space) error {
+	fmt.Println(fmt.Sprintf("%s %s", instance.Name, space.Name))
 	return nil
 }
 
@@ -57,6 +71,9 @@ func main() {
 	}
 
 	org, err := client.GetOrgByName(opts.OrgName)
+	if err != nil {
+		log.Fatalf("error getting org: %s", err.Error())
+	}
 
 	instances, err := listInstances(client, org.Guid)
 	if err != nil {
@@ -64,14 +81,21 @@ func main() {
 	}
 
 	spaces, err := listSpaces(client, org.Guid)
+	if err != nil {
+		log.Fatalf("error listing spaces: %s", err.Error())
+	}
 
-	services := make(map[string]bool, len(opts.ServiceGUIDs))
-	for _, service := range opts.ServiceGUIDs {
-		services[service] = true
+	services := make(map[string]bool, len(opts.ServiceNames))
+	for _, label := range opts.ServiceNames {
+		service, err := getServiceByName(client, label)
+		if err != nil {
+			log.Fatal(err.Error())
+		}
+		services[service.Guid] = true
 	}
 
 	for _, instance := range instances {
-		if _, ok := services[instance.ServicePlanGuid]; ok {
+		if _, ok := services[instance.ServiceGuid]; ok {
 			sendMail(instance, spaces[instance.SpaceGuid])
 		}
 	}

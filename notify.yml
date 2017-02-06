@@ -12,4 +12,4 @@ inputs:
   path: gopath/src/github.com/18F/cg-sandbox
 
 run:
-  path: sandbox-config/notify.sh
+  path: gopath/src/github.com/18F/cg-sandbox/notify.sh
