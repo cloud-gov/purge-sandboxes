@@ -14,6 +14,50 @@ jobs:
       CLIENT_SECRET: {{notify-client-secret}}
       ORG_NAME: {{notify-org-name}}
       SERVICE_NAMES: {{notify-service-names}}
+  on_failure:
+    put: slack
+    params: &slack-params
+      text: |
+        :x: FAILED to notify sandbox users
+        <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
+      channel: {{slack-channel}}
+      username: {{slack-username}}
+      icon_url: {{slack-icon-url}}
+  on_success:
+    put: slack
+    params:
+      <<: *slack-params
+      text: |
+        :white_check_mark: Successfully notified sandbox users
+        <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
+
+- name: purge-sandboxes
+  plan:
+  - aggregate:
+    - get: sandbox-config
+    - get: purge-schedule
+      trigger: true
+  - task: purge
+    file: sandbox-config/purge.yml
+    params:
+      API_ADDRESS: {{purge-api-url}}
+      CLIENT_ID: {{purge-client-id}}
+      CLIENT_SECRET: {{purge-client-secret}}
+      ORG_NAME: {{purge-org-name}}
+  on_failure:
+    put: slack
+    params:
+      <<: *slack-params
+      text: |
+        :x: FAILED to purge sandbox org
+        <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
+  on_success:
+    put: slack
+    params:
+      <<: *slack-params
+      text: |
+        :white_check_mark: Successfully purged sandbox org
+        <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
 
 resources:
 - name: sandbox-config
@@ -28,8 +72,24 @@ resources:
     expression: {{notify-schedule-expression}}
     location: {{notify-schedule-location}}
 
+- name: purge-schedule
+  type: cron-resource
+  source:
+    expression: {{purge-schedule-expression}}
+    location: {{purge-schedule-location}}
+
+- name: slack
+  type: slack-notification
+  source:
+    url: {{slack-webhook-url}}
+
 resource_types:
 - name: cron-resource
   type: docker-image
   source:
     repository: cftoolsmiths/cron-test
+
+- name: slack-notification
+  type: docker-image
+  source:
+    repository: cfcommunity/slack-notification-resource
