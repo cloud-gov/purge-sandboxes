@@ -150,10 +150,11 @@ func main() {
 	}
 
 	for spaceGuid, instances := range instances {
-		space := spaces[spaceGuid]
-		recipient := fmt.Sprintf("%s@%s", space.Name, org.Name)
-		if err := sendMail(opts, tmpl, instances, space, recipient); err != nil {
-			log.Fatalf("error sending mail", err.Error())
+		if space, ok := spaces[spaceGuid]; ok {
+			recipient := fmt.Sprintf("%s@%s", space.Name, org.Name)
+			if err := sendMail(opts, tmpl, instances, space, recipient); err != nil {
+				log.Fatalf("error sending mail", err.Error())
+			}
 		}
 	}
 }
