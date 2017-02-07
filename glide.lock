@@ -2,7 +2,7 @@ hash: 9a20a0e842067ba47bd6aba04b9e8c566e9f8135f525e55e56d8e9bcd96ec90c
 updated: 2017-02-07T09:47:56.9976562-05:00
 imports:
 - name: github.com/cloudfoundry-community/go-cfclient
-  version: 3fa856bab9486ab8178d5fc20797fb853e2cc1b4
+  version: 856f0964bf1bc7986264979f34003bb9e463b953
 - name: github.com/golang/protobuf
   version: 874264fbbb43f4d91e999fecb4b40143ed611400
   subpackages:

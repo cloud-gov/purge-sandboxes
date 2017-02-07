@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"strings"
 	"text/template"
 
 	"github.com/cloudfoundry-community/go-cfclient"
@@ -74,12 +75,27 @@ func listSpaces(client *cfclient.Client, orgGUID string) (map[string]cfclient.Sp
 	return m, nil
 }
 
+// listRecipients get a list of recipient emails from a space
+func listRecipients(space cfclient.Space) ([]string, error) {
+	recipients := []string{}
+	roles, err := space.Roles()
+	if err != nil {
+		return recipients, err
+	}
+	for _, role := range roles {
+		if strings.Contains(role.Username, "@") {
+			recipients = append(recipients, role.Username)
+		}
+	}
+	return recipients, nil
+}
+
 func sendMail(
 	opts Options,
 	tmpl *template.Template,
 	instances []cfclient.ServiceInstance,
 	space cfclient.Space,
-	recipient string,
+	recipients []string,
 ) error {
 	b := bytes.Buffer{}
 	if err := tmpl.Execute(&b, map[string]interface{}{
@@ -89,7 +105,7 @@ func sendMail(
 		return err
 	}
 
-	log.Printf("sending to %s: %s", recipient, b.String())
+	log.Printf("sending to %s: %s", recipients, b.String())
 
 	d := gomail.NewDialer(opts.SMTPHost, opts.SMTPPort, opts.SMTPUser, opts.SMTPPass)
 	s, err := d.Dial()
@@ -98,9 +114,11 @@ func sendMail(
 	}
 
 	m := gomail.NewMessage()
-	m.SetHeader("From", opts.MailSender)
-	m.SetHeader("Subject", opts.MailSubject)
-	m.SetAddressHeader("To", recipient, recipient)
+	m.SetHeaders(map[string][]string{
+		"From":    {opts.MailSender},
+		"Subject": {opts.MailSubject},
+		"To":      recipients,
+	})
 	m.SetBody("text/plain", b.String())
 	return gomail.Send(s, m)
 }
@@ -151,8 +169,11 @@ func main() {
 
 	for spaceGuid, instances := range instances {
 		if space, ok := spaces[spaceGuid]; ok {
-			recipient := fmt.Sprintf("%s@%s", space.Name, org.Name)
-			if err := sendMail(opts, tmpl, instances, space, recipient); err != nil {
+			recipients, err := listRecipients(space)
+			if err != nil {
+				log.Fatalf("error listing recipients", err.Error())
+			}
+			if err := sendMail(opts, tmpl, instances, space, recipients); err != nil {
 				log.Fatalf("error sending mail", err.Error())
 			}
 		}
