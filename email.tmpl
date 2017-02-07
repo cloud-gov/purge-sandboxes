@@ -1,0 +1,5 @@
+Warning: space {{.space.Name}} will be deleted on the first of the month. The following service instances with persistent data will be deleted:
+
+{{range $instance := .instances -}}
+* {{$instance.Name -}}
+{{end}}

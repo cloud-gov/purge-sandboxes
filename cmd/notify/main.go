@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"log"
+	"net/smtp"
 	"net/url"
+	"text/template"
 
 	"github.com/cloudfoundry-community/go-cfclient"
 	"github.com/kelseyhightower/envconfig"
@@ -15,6 +18,11 @@ type Options struct {
 	ClientSecret string   `envconfig:"client_secret" required:"true"`
 	OrgName      string   `envconfig:"org_name" required:"true"`
 	ServiceNames []string `envconfig:"service_names" required:"true"`
+	SMTPHost     string   `envconfig:"smtp_host" required:"true"`
+	SMTPPort     string   `envconfig:"smtp_port" default:"587"`
+	SMTPUser     string   `envconfig:"smtp_user" required:"true"`
+	SMTPPass     string   `envconfig:"smtp_pass" required:"true"`
+	MailSender   string   `envconfig:"mail_sender" required:"true"`
 }
 
 func getServiceByName(client *cfclient.Client, service string) (cfclient.Service, error) {
@@ -30,12 +38,27 @@ func getServiceByName(client *cfclient.Client, service string) (cfclient.Service
 	return services[0], nil
 }
 
-func listInstances(client *cfclient.Client, orgGUID string) ([]cfclient.ServiceInstance, error) {
+// listInstances gets a map from space guids to lists of relevant service instances
+func listInstances(client *cfclient.Client, orgGUID string, services map[string]bool) (map[string][]cfclient.ServiceInstance, error) {
 	q := url.Values{}
 	q.Set("q", fmt.Sprintf("organization_guid:%s", orgGUID))
-	return client.ListServiceInstancesByQuery(q)
+	instances, err := client.ListServiceInstancesByQuery(q)
+	m := map[string][]cfclient.ServiceInstance{}
+	if err != nil {
+		return m, err
+	}
+	for _, instance := range instances {
+		if _, ok := services[instance.ServiceGuid]; ok {
+			if _, ok := m[instance.SpaceGuid]; !ok {
+				m[instance.SpaceGuid] = []cfclient.ServiceInstance{}
+			}
+			m[instance.SpaceGuid] = append(m[instance.SpaceGuid], instance)
+		}
+	}
+	return m, nil
 }
 
+// listSpaces gets a map from space guids to spaces
 func listSpaces(client *cfclient.Client, orgGUID string) (map[string]cfclient.Space, error) {
 	q := url.Values{}
 	q.Set("q", fmt.Sprintf("organization_guid:%s", orgGUID))
@@ -50,15 +73,48 @@ func listSpaces(client *cfclient.Client, orgGUID string) (map[string]cfclient.Sp
 	return m, nil
 }
 
-func sendMail(instance cfclient.ServiceInstance, space cfclient.Space) error {
-	fmt.Println(fmt.Sprintf("%s %s", instance.Name, space.Name))
-	return nil
+func sendMail(
+	opts Options,
+	tmpl *template.Template,
+	instances []cfclient.ServiceInstance,
+	space cfclient.Space,
+	recipient string,
+) error {
+	auth := smtp.PlainAuth(
+		"",
+		opts.SMTPUser,
+		opts.SMTPPass,
+		opts.SMTPHost,
+	)
+
+	b := bytes.Buffer{}
+	if err := tmpl.Execute(&b, map[string]interface{}{
+		"space":     space,
+		"instances": instances,
+	}); err != nil {
+		return err
+	}
+
+	log.Printf("sending to %s: %s", recipient, b.String())
+
+	return smtp.SendMail(
+		fmt.Sprintf("%s:%s", opts.SMTPHost, opts.SMTPPort),
+		auth,
+		opts.MailSender,
+		[]string{recipient},
+		b.Bytes(),
+	)
 }
 
 func main() {
 	var opts Options
 	if err := envconfig.Process("", &opts); err != nil {
 		log.Fatalf("error parsing options: %s", err.Error())
+	}
+
+	tmpl, err := template.ParseFiles("./email.tmpl")
+	if err != nil {
+		log.Fatalf("error reading template: %s", err.Error())
 	}
 
 	client, err := cfclient.NewClient(&cfclient.Config{
@@ -75,16 +131,6 @@ func main() {
 		log.Fatalf("error getting org: %s", err.Error())
 	}
 
-	instances, err := listInstances(client, org.Guid)
-	if err != nil {
-		log.Fatalf("error listing instances: %s", err.Error())
-	}
-
-	spaces, err := listSpaces(client, org.Guid)
-	if err != nil {
-		log.Fatalf("error listing spaces: %s", err.Error())
-	}
-
 	services := make(map[string]bool, len(opts.ServiceNames))
 	for _, label := range opts.ServiceNames {
 		service, err := getServiceByName(client, label)
@@ -94,9 +140,21 @@ func main() {
 		services[service.Guid] = true
 	}
 
-	for _, instance := range instances {
-		if _, ok := services[instance.ServiceGuid]; ok {
-			sendMail(instance, spaces[instance.SpaceGuid])
+	instances, err := listInstances(client, org.Guid, services)
+	if err != nil {
+		log.Fatalf("error listing instances: %s", err.Error())
+	}
+
+	spaces, err := listSpaces(client, org.Guid)
+	if err != nil {
+		log.Fatalf("error listing spaces: %s", err.Error())
+	}
+
+	for spaceGuid, instances := range instances {
+		space := spaces[spaceGuid]
+		recipient := fmt.Sprintf("%s@%s", space.Name, org.Name)
+		if err := sendMail(opts, tmpl, instances, space, recipient); err != nil {
+			log.Fatalf("error sending mail", err.Error())
 		}
 	}
 }
