@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"log"
+	"net/main"
 	"net/url"
-	"strings"
 	"text/template"
 
 	"github.com/cloudfoundry-community/go-cfclient"
@@ -83,7 +83,7 @@ func listRecipients(space cfclient.Space) ([]string, error) {
 		return recipients, err
 	}
 	for _, role := range roles {
-		if strings.Contains(role.Username, "@") {
+		if _, err := mail.ParseAddress(role.Username); err == nil {
 			recipients = append(recipients, role.Username)
 		}
 	}
