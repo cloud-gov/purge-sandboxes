@@ -4,12 +4,12 @@ import (
 	"bytes"
 	"fmt"
 	"log"
-	"net/smtp"
 	"net/url"
 	"text/template"
 
 	"github.com/cloudfoundry-community/go-cfclient"
 	"github.com/kelseyhightower/envconfig"
+	"gopkg.in/gomail.v2"
 )
 
 type Options struct {
@@ -19,10 +19,11 @@ type Options struct {
 	OrgName      string   `envconfig:"org_name" required:"true"`
 	ServiceNames []string `envconfig:"service_names" required:"true"`
 	SMTPHost     string   `envconfig:"smtp_host" required:"true"`
-	SMTPPort     string   `envconfig:"smtp_port" default:"587"`
+	SMTPPort     int      `envconfig:"smtp_port" default:"587"`
 	SMTPUser     string   `envconfig:"smtp_user" required:"true"`
 	SMTPPass     string   `envconfig:"smtp_pass" required:"true"`
 	MailSender   string   `envconfig:"mail_sender" required:"true"`
+	MailSubject  string   `envconfig:"mail_subject" required:"true"`
 }
 
 func getServiceByName(client *cfclient.Client, service string) (cfclient.Service, error) {
@@ -80,13 +81,6 @@ func sendMail(
 	space cfclient.Space,
 	recipient string,
 ) error {
-	auth := smtp.PlainAuth(
-		"",
-		opts.SMTPUser,
-		opts.SMTPPass,
-		opts.SMTPHost,
-	)
-
 	b := bytes.Buffer{}
 	if err := tmpl.Execute(&b, map[string]interface{}{
 		"space":     space,
@@ -97,13 +91,18 @@ func sendMail(
 
 	log.Printf("sending to %s: %s", recipient, b.String())
 
-	return smtp.SendMail(
-		fmt.Sprintf("%s:%s", opts.SMTPHost, opts.SMTPPort),
-		auth,
-		opts.MailSender,
-		[]string{recipient},
-		b.Bytes(),
-	)
+	d := gomail.NewDialer(opts.SMTPHost, opts.SMTPPort, opts.SMTPUser, opts.SMTPPass)
+	s, err := d.Dial()
+	if err != nil {
+		return err
+	}
+
+	m := gomail.NewMessage()
+	m.SetHeader("From", opts.MailSender)
+	m.SetHeader("Subject", opts.MailSubject)
+	m.SetAddressHeader("To", recipient, recipient)
+	m.SetBody("text/plain", b.String())
+	return gomail.Send(s, m)
 }
 
 func main() {
