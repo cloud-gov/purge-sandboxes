@@ -1,8 +1,8 @@
-hash: be2b9cc27ce31418f890d5d68e8d6d788ec0ab89a3d9545aaf5d6425300d5563
-updated: 2017-02-06T14:49:16.140749769-05:00
+hash: 9a20a0e842067ba47bd6aba04b9e8c566e9f8135f525e55e56d8e9bcd96ec90c
+updated: 2017-02-07T09:47:56.9976562-05:00
 imports:
 - name: github.com/cloudfoundry-community/go-cfclient
-  version: 3f90a39824374b1a0b04f9d2b29d5d0a9682a8da
+  version: 856f0964bf1bc7986264979f34003bb9e463b953
 - name: github.com/golang/protobuf
   version: 874264fbbb43f4d91e999fecb4b40143ed611400
   subpackages:
@@ -28,4 +28,8 @@ imports:
   - internal/remote_api
   - internal/urlfetch
   - urlfetch
+- name: gopkg.in/alexcesaro/quotedprintable.v3
+  version: 2caba252f4dc53eaf6b553000885530023f54623
+- name: gopkg.in/gomail.v2
+  version: 81ebce5c23dfd25c6c67194b37d3dd3f338c98b1
 testImports: []
