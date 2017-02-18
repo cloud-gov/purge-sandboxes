@@ -12,6 +12,7 @@ type Options struct {
 	ClientID     string `envconfig:"client_id" required:"true"`
 	ClientSecret string `envconfig:"client_secret" required:"true"`
 	OrgName      string `envconfig:"org_name" required:"true"`
+	BotUser      string `envconfig:"bot_user" required:"true"`
 }
 
 func main() {
@@ -37,5 +38,15 @@ func main() {
 	err = client.DeleteOrg(org.Guid)
 	if err != nil {
 		log.Fatalf("error deleting org: %s", err.Error())
+	}
+
+	err = client.CreateOrg(opts.OrgName)
+	if err != nil {
+		log.Fatalf("error recreating org: %s", err.Error())
+	}
+
+	err = client.AssociateManagerByUsername(opts.BotUser)
+	if err != nil {
+		log.Fatalf("error adding orgmanager: %s", err.Error())
 	}
 }
