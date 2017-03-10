@@ -13,7 +13,6 @@ jobs:
       CLIENT_ID: {{notify-client-id}}
       CLIENT_SECRET: {{notify-client-secret}}
       ORG_NAME: {{notify-org-name}}
-      SERVICE_NAMES: {{notify-service-names}}
       SMTP_HOST: {{notify-smtp-host}}
       SMTP_USER: {{notify-smtp-user}}
       SMTP_PASS: {{notify-smtp-pass}}
