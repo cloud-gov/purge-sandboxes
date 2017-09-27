@@ -8,7 +8,7 @@ import (
 
 func TestListServicesInstances(t *testing.T) {
 	Convey("List Service Instances", t, func() {
-		setup(MockRoute{"GET", "/v2/service_instances", listServiceInstancePayload, ""}, t)
+		setup(MockRoute{"GET", "/v2/service_instances", listServiceInstancePayload, "", 200, "", nil}, t)
 		defer teardown()
 		c := &Config{
 			ApiAddress: server.URL,
@@ -28,7 +28,7 @@ func TestListServicesInstances(t *testing.T) {
 
 func TestServiceInstanceByGuid(t *testing.T) {
 	Convey("Service instance by Guid", t, func() {
-		setup(MockRoute{"GET", "/v2/service_instances/8423ca96-90ad-411f-b77a-0907844949fc", serviceInstancePayload, ""}, t)
+		setup(MockRoute{"GET", "/v2/service_instances/8423ca96-90ad-411f-b77a-0907844949fc", serviceInstancePayload, "", 200, "", nil}, t)
 		defer teardown()
 
 		c := &Config{
@@ -38,11 +38,13 @@ func TestServiceInstanceByGuid(t *testing.T) {
 		client, err := NewClient(c)
 		So(err, ShouldBeNil)
 
-		service, err := client.ServiceInstanceByGuid("8423ca96-90ad-411f-b77a-0907844949fc")
+		service, err := client.GetServiceInstanceByGuid("8423ca96-90ad-411f-b77a-0907844949fc")
 		So(err, ShouldBeNil)
 
 		expected := ServiceInstance{
 			Guid:        "8423ca96-90ad-411f-b77a-0907844949fc",
+			CreatedAt:   "2016-10-21T18:22:56Z",
+			UpdatedAt:   "2016-10-21T18:22:56Z",
 			Credentials: map[string]interface{}{},
 			Name:        "fortunes-db",
 			LastOperation: LastOperation{
