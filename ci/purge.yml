@@ -5,11 +5,11 @@ image_resource:
   type: docker-image
   source:
     repository: golang
-    tag: "1.7"
+    tag: "1.8"
 
 inputs:
-- name: sandbox-config
+- name: sandbox-source
   path: gopath/src/github.com/18F/cg-sandbox
 
 run:
-  path: gopath/src/github.com/18F/cg-sandbox/notify.sh
+  path: gopath/src/github.com/18F/cg-sandbox/ci/purge.sh

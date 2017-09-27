@@ -14,12 +14,10 @@ import (
 )
 
 type SMTPOptions struct {
-	SMTPHost    string `envconfig:"smtp_host" required:"true"`
-	SMTPPort    int    `envconfig:"smtp_port" default:"587"`
-	SMTPUser    string `envconfig:"smtp_user" required:"true"`
-	SMTPPass    string `envconfig:"smtp_pass" required:"true"`
-	MailSender  string `envconfig:"mail_sender" required:"true"`
-	MailSubject string `envconfig:"mail_subject" required:"true"`
+	SMTPHost string `envconfig:"smtp_host" required:"true"`
+	SMTPPort int    `envconfig:"smtp_port" default:"587"`
+	SMTPUser string `envconfig:"smtp_user" required:"true"`
+	SMTPPass string `envconfig:"smtp_pass" required:"true"`
 }
 
 // ListRecipients get a list of recipient emails from a space
@@ -39,6 +37,8 @@ func ListRecipients(space cfclient.Space) ([]string, error) {
 
 func SendMail(
 	opts SMTPOptions,
+	sender string,
+	subject string,
 	tmpl *template.Template,
 	space cfclient.Space,
 	recipients []string,
@@ -60,8 +60,8 @@ func SendMail(
 
 	m := gomail.NewMessage()
 	m.SetHeaders(map[string][]string{
-		"From":    {opts.MailSender},
-		"Subject": {opts.MailSubject},
+		"From":    {sender},
+		"Subject": {subject},
 		"To":      recipients,
 	})
 	m.SetBody("text/plain", b.String())
