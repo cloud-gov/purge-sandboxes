@@ -1,0 +1,15 @@
+---
+platform: linux
+
+image_resource:
+  type: docker-image
+  source:
+    repository: golang
+    tag: "1.8"
+
+inputs:
+- name: sandbox-source
+  path: gopath/src/github.com/18F/cg-sandbox
+
+run:
+  path: gopath/src/github.com/18F/cg-sandbox/ci/test.sh

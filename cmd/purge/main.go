@@ -18,6 +18,9 @@ type Options struct {
 	NotifyDays        int    `envconfig:"notify_days" default:"25"`
 	PurgeCreateDays   int    `envconfig:"purge_create_days" default:"30"`
 	PurgeActivityDays int    `envconfig:"purge_activity_days" default:"5"`
+	MailSender        string `envconfig:"mail_sender" required:"true"`
+	NotifyMailSubject string `envconfig:"notify_mail_subject" required:"true"`
+	PurgeMailSubject  string `envconfig:"purge_mail_subject" required:"true"`
 	sandbox.SMTPOptions
 }
 
@@ -67,7 +70,7 @@ func main() {
 			if err != nil {
 				log.Fatalf("error listing recipients on space %s: %s", space.Name, err.Error())
 			}
-			if err := sandbox.SendMail(opts.SMTPOptions, notifyTemplate, space, recipients); err != nil {
+			if err := sandbox.SendMail(opts.SMTPOptions, opts.MailSender, opts.NotifyMailSubject, notifyTemplate, space, recipients); err != nil {
 				log.Fatalf("error sending mail on space %s: %s", space.Name, err.Error())
 			}
 		}
@@ -82,7 +85,7 @@ func main() {
 			if err != nil {
 				log.Fatalf("error listing recipients on space %s: %s", space.Name, err.Error())
 			}
-			if err := sandbox.SendMail(opts.SMTPOptions, purgeTemplate, space, recipients); err != nil {
+			if err := sandbox.SendMail(opts.SMTPOptions, opts.MailSender, opts.PurgeMailSubject, purgeTemplate, space, recipients); err != nil {
 				log.Fatalf("error sending mail on space %s: %s", space.Name, err.Error())
 			}
 			if err := client.DeleteSpace(space.Guid, true, true); err != nil {

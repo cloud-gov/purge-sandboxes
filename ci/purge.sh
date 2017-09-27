@@ -7,4 +7,4 @@ export PATH=$PATH:$GOPATH/bin
 
 cd gopath/src/github.com/18F/cg-sandbox
 
-go run cmd/notify/main.go
+go run cmd/purge/main.go

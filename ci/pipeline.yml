@@ -1,0 +1,117 @@
+---
+jobs:
+- name: test
+  plan:
+  - get: sandbox-source
+    trigger: true
+  - task: test
+    file: sandbox-source/ci/test.yml
+
+- name: purge-sandboxes-staging
+  plan:
+  - aggregate:
+    - get: sandbox-source
+      passed: [test]
+    - get: schedule
+      trigger: true
+  - task: purge
+    file: sandbox-source/purge.yml
+    params:
+      API_ADDRESS: {{api-url-staging}}
+      CLIENT_ID: {{client-id-staging}}
+      CLIENT_SECRET: {{client-secret-staging}}
+      ORG_PREFIX: {{org-prefix}}
+      NOTIFY_DAYS: {{notify-days}}
+      PURGE_CREATE_DAYS: {{purge-create-days}}
+      PURGE_ACTIVITY_DAYS: {{purge-activity-days}}
+      SMTP_HOST: {{smtp-host}}
+      SMTP_USER: {{smtp-user}}
+      SMTP_PASS: {{smtp-pass}}
+      SMTP_PORT: {{smtp-port}}
+      MAIL_SENDER: {{sender}}
+      NOTIFY_MAIL_SUBJECT: {{notify-subject}}
+      PURGE_MAIL_SUBJECT: {{purge-subject}}
+  on_failure:
+    put: slack
+    params: &slack-params
+      text: |
+        :x: FAILED to notify sandbox users on staging
+        <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
+      channel: {{slack-channel}}
+      username: {{slack-username}}
+      icon_url: {{slack-icon-url}}
+  on_success:
+    put: slack
+    params:
+      <<: *slack-params
+      text: |
+        :white_check_mark: Successfully notified sandbox users on staging
+        <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
+
+- name: purge-sandboxes-production
+  plan:
+  - aggregate:
+    - get: sandbox-source
+      passed: [purge-sandboxes-staging]
+    - get: schedule
+      trigger: true
+  - task: purge
+    file: sandbox-source/purge.yml
+    params:
+      API_ADDRESS: {{api-url-production}}
+      CLIENT_ID: {{client-id-production}}
+      CLIENT_SECRET: {{client-secret-production}}
+      ORG_PREFIX: {{org-prefix}}
+      NOTIFY_DAYS: {{notify-days}}
+      PURGE_CREATE_DAYS: {{purge-create-days}}
+      PURGE_ACTIVITY_DAYS: {{purge-activity-days}}
+      SMTP_HOST: {{smtp-host}}
+      SMTP_USER: {{smtp-user}}
+      SMTP_PASS: {{smtp-pass}}
+      SMTP_PORT: {{smtp-port}}
+      MAIL_SENDER: {{sender}}
+      NOTIFY_MAIL_SUBJECT: {{notify-subject}}
+      PURGE_MAIL_SUBJECT: {{purge-subject}}
+  on_failure:
+    put: slack
+    params:
+      <<: *slack-params
+      text: |
+        :x: FAILED to notify sandbox users on production
+        <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
+  on_success:
+    put: slack
+    params:
+      <<: *slack-params
+      text: |
+        :white_check_mark: Successfully notified sandbox users on production
+        <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
+
+resources:
+- name: sandbox-source
+  type: git
+  source:
+    uri: {{sandbox-config-uri}}
+    branch: {{sandbox-config-branch}}
+
+- name: schedule
+  type: cron-resource
+  source:
+    expression: {{schedule-expression}}
+    location: {{schedule-location}}
+
+- name: slack
+  type: slack-notification
+  source:
+    url: {{slack-webhook-url}}
+
+resource_types:
+- name: cron-resource
+  type: docker-image
+  source:
+    repository: cftoolsmiths/cron-test
+
+- name: slack-notification
+  type: docker-image
+  source:
+    repository: cfcommunity/slack-notification-resource
