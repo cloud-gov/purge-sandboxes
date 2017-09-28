@@ -3,7 +3,6 @@ package sandbox
 import (
 	"bytes"
 	"html/template"
-	"log"
 	"net/mail"
 	"net/url"
 	"strings"
@@ -21,35 +20,42 @@ type SMTPOptions struct {
 }
 
 // ListRecipients get a list of recipient emails from a space
-func ListRecipients(space cfclient.Space) ([]string, error) {
-	recipients := []string{}
-	roles, err := space.Roles()
+func ListRecipients(space cfclient.Space) (addresses, developers, managers []string, err error) {
+	var roles []cfclient.SpaceRole
+	roles, err = space.Roles()
 	if err != nil {
-		return recipients, err
+		return
 	}
 	for _, role := range roles {
 		if _, err := mail.ParseAddress(role.Username); err == nil {
-			recipients = append(recipients, role.Username)
+			addresses = append(addresses, role.Username)
+		}
+		for _, roleType := range role.SpaceRoles {
+			if roleType == "space_developer" {
+				developers = append(developers, role.Guid)
+			} else if roleType == "space_manager" {
+				developers = append(managers, role.Guid)
+			}
 		}
 	}
-	return recipients, nil
+	return
+}
+
+func RenderTemplate(tmpl *template.Template, data map[string]interface{}) (string, error) {
+	buf := bytes.Buffer{}
+	if err := tmpl.Execute(&buf, data); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }
 
 func SendMail(
 	opts SMTPOptions,
 	sender string,
 	subject string,
-	tmpl *template.Template,
-	data map[string]interface{},
+	body string,
 	recipients []string,
 ) error {
-	b := bytes.Buffer{}
-	if err := tmpl.Execute(&b, data); err != nil {
-		return err
-	}
-
-	log.Printf("sending to %s: %s", recipients, b.String())
-
 	d := gomail.NewDialer(opts.SMTPHost, opts.SMTPPort, opts.SMTPUser, opts.SMTPPass)
 	s, err := d.Dial()
 	if err != nil {
@@ -62,7 +68,7 @@ func SendMail(
 		"Subject": {subject},
 		"To":      recipients,
 	})
-	m.SetBody("text/plain", b.String())
+	m.SetBody("text/plain", body)
 	return gomail.Send(s, m)
 }
 
