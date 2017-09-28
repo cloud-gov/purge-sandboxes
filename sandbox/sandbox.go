@@ -150,8 +150,8 @@ func ListPurgeSpaces(
 	apps []cfclient.App,
 	instances []cfclient.ServiceInstance,
 	now time.Time,
-	notifyThreshold float64,
-	purgeThreshold float64,
+	notifyThreshold int,
+	purgeThreshold int,
 ) (
 	toNotify []cfclient.Space,
 	toPurge []cfclient.Space,
@@ -167,7 +167,7 @@ func ListPurgeSpaces(
 			continue
 		}
 
-		delta := now.Sub(firstResource.Truncate(24*time.Hour)).Hours() / 24
+		delta := int(now.Sub(firstResource.Truncate(24*time.Hour)).Hours() / 24)
 		if delta == notifyThreshold {
 			toNotify = append(toNotify, space)
 		} else if delta >= purgeThreshold {
