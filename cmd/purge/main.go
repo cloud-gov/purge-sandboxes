@@ -12,16 +12,16 @@ import (
 )
 
 type Options struct {
-	APIAddress        string  `envconfig:"api_address" required:"true"`
-	ClientID          string  `envconfig:"client_id" required:"true"`
-	ClientSecret      string  `envconfig:"client_secret" required:"true"`
-	OrgPrefix         string  `envconfig:"org_prefix" required:"true"`
-	NotifyDays        float64 `envconfig:"notify_days" default:"25"`
-	PurgeDays         float64 `envconfig:"purge_create_days" default:"30"`
-	MailSender        string  `envconfig:"mail_sender" required:"true"`
-	NotifyMailSubject string  `envconfig:"notify_mail_subject" required:"true"`
-	PurgeMailSubject  string  `envconfig:"purge_mail_subject" required:"true"`
-	DryRun            bool    `envconfig:"dry_run" default:"true"`
+	APIAddress        string `envconfig:"api_address" required:"true"`
+	ClientID          string `envconfig:"client_id" required:"true"`
+	ClientSecret      string `envconfig:"client_secret" required:"true"`
+	OrgPrefix         string `envconfig:"org_prefix" required:"true"`
+	NotifyDays        int    `envconfig:"notify_days" default:"25"`
+	PurgeDays         int    `envconfig:"purge_create_days" default:"30"`
+	MailSender        string `envconfig:"mail_sender" required:"true"`
+	NotifyMailSubject string `envconfig:"notify_mail_subject" required:"true"`
+	PurgeMailSubject  string `envconfig:"purge_mail_subject" required:"true"`
+	DryRun            bool   `envconfig:"dry_run" default:"true"`
 	sandbox.SMTPOptions
 }
 
@@ -73,7 +73,7 @@ func main() {
 			if err != nil {
 				log.Fatalf("error listing recipients on space %s: %s", space.Name, err.Error())
 			}
-			log.Printf("Notifying space %s; recipients %+v", recipients, space.Name)
+			log.Printf("Notifying space %s; recipients %+v", space.Name, recipients)
 			if !opts.DryRun {
 				if err := sandbox.SendMail(opts.SMTPOptions, opts.MailSender, opts.NotifyMailSubject, notifyTemplate, space, recipients); err != nil {
 					log.Fatalf("error sending mail on space %s: %s", space.Name, err.Error())
@@ -86,7 +86,7 @@ func main() {
 			if err != nil {
 				log.Fatalf("error listing recipients on space %s: %s", space.Name, err.Error())
 			}
-			log.Printf("Purging space %s; recipients %+v", recipients, space.Name)
+			log.Printf("Purging space %s; recipients %+v", space.Name, recipients)
 			if !opts.DryRun {
 				if err := sandbox.SendMail(opts.SMTPOptions, opts.MailSender, opts.PurgeMailSubject, purgeTemplate, space, recipients); err != nil {
 					log.Fatalf("error sending mail on space %s: %s", space.Name, err.Error())
