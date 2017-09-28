@@ -75,7 +75,11 @@ func main() {
 			}
 			log.Printf("Notifying space %s; recipients %+v", space.Name, recipients)
 			if !opts.DryRun {
-				if err := sandbox.SendMail(opts.SMTPOptions, opts.MailSender, opts.NotifyMailSubject, notifyTemplate, space, recipients); err != nil {
+				data := map[string]interface{}{
+					"space": space,
+					"days":  opts.PurgeDays - opts.NotifyDays,
+				}
+				if err := sandbox.SendMail(opts.SMTPOptions, opts.MailSender, opts.NotifyMailSubject, notifyTemplate, data, recipients); err != nil {
 					log.Fatalf("error sending mail on space %s: %s", space.Name, err.Error())
 				}
 			}
@@ -88,7 +92,8 @@ func main() {
 			}
 			log.Printf("Purging space %s; recipients %+v", space.Name, recipients)
 			if !opts.DryRun {
-				if err := sandbox.SendMail(opts.SMTPOptions, opts.MailSender, opts.PurgeMailSubject, purgeTemplate, space, recipients); err != nil {
+				data := map[string]interface{}{"space": space}
+				if err := sandbox.SendMail(opts.SMTPOptions, opts.MailSender, opts.PurgeMailSubject, purgeTemplate, data, recipients); err != nil {
 					log.Fatalf("error sending mail on space %s: %s", space.Name, err.Error())
 				}
 				if err := client.DeleteSpace(space.Guid, true, true); err != nil {
