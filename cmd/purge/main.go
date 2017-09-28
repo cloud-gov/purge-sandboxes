@@ -69,7 +69,7 @@ func main() {
 		}
 
 		for _, space := range toNotify {
-			recipients, err := sandbox.ListRecipients(space)
+			recipients, _, _, err := sandbox.ListRecipients(space)
 			if err != nil {
 				log.Fatalf("error listing recipients on space %s: %s", space.Name, err.Error())
 			}
@@ -79,25 +79,45 @@ func main() {
 					"space": space,
 					"days":  opts.PurgeDays - opts.NotifyDays,
 				}
-				if err := sandbox.SendMail(opts.SMTPOptions, opts.MailSender, opts.NotifyMailSubject, notifyTemplate, data, recipients); err != nil {
+				body, err := sandbox.RenderTemplate(notifyTemplate, data)
+				log.Printf("sending to %s: %s", recipients, body)
+				if err != nil {
+					log.Fatalf("error rendering email: %s", err.Error())
+				}
+				if err := sandbox.SendMail(opts.SMTPOptions, opts.MailSender, opts.NotifyMailSubject, body, recipients); err != nil {
 					log.Fatalf("error sending mail on space %s: %s", space.Name, err.Error())
 				}
 			}
 		}
 
 		for _, space := range toPurge {
-			recipients, err := sandbox.ListRecipients(space)
+			recipients, developers, managers, err := sandbox.ListRecipients(space)
 			if err != nil {
 				log.Fatalf("error listing recipients on space %s: %s", space.Name, err.Error())
 			}
 			log.Printf("Purging space %s; recipients %+v", space.Name, recipients)
 			if !opts.DryRun {
 				data := map[string]interface{}{"space": space}
-				if err := sandbox.SendMail(opts.SMTPOptions, opts.MailSender, opts.PurgeMailSubject, purgeTemplate, data, recipients); err != nil {
+				body, err := sandbox.RenderTemplate(purgeTemplate, data)
+				log.Printf("sending to %s: %s", recipients, body)
+				if err != nil {
+					log.Fatalf("error rendering email: %s", err.Error())
+				}
+				if err := sandbox.SendMail(opts.SMTPOptions, opts.MailSender, opts.PurgeMailSubject, body, recipients); err != nil {
 					log.Fatalf("error sending mail on space %s: %s", space.Name, err.Error())
 				}
+				log.Printf("deleting and recreating space %s", space.Name)
 				if err := client.DeleteSpace(space.Guid, true, true); err != nil {
 					log.Fatalf("error deleting space %s: %s", space.Name, err.Error())
+				}
+				if _, err := client.CreateSpace(cfclient.SpaceRequest{
+					Name:              space.Name,
+					OrganizationGuid:  space.OrganizationGuid,
+					SpaceQuotaDefGuid: []string{space.QuotaDefinitionGuid},
+					DeveloperGuid:     developers,
+					ManagerGuid:       managers,
+				}); err != nil {
+					log.Fatalf("error recreating space %s: %s", space.Name, err.Error())
 				}
 			}
 		}
