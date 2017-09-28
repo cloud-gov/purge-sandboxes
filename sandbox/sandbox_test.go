@@ -12,142 +12,158 @@ import (
 )
 
 var _ = Describe("Sandbox", func() {
-	Describe("ListNotifySpaces", func() {
+	Describe("ListPurgeSpaces", func() {
 		var (
 			spaces    []cfclient.Space
 			apps      []cfclient.App
 			instances []cfclient.ServiceInstance
+			now       time.Time
 		)
 
-		It("skips recently created spaces", func() {
+		BeforeEach(func() {
 			spaces = []cfclient.Space{
-				{
-					Guid:      "space-guid",
-					CreatedAt: time.Now().Format(time.RFC3339Nano),
-				},
+				{Guid: "space-guid"},
 			}
-			apps = []cfclient.App{
-				{
-					Guid:      "app-guid",
-					SpaceGuid: "space-guid",
-				},
-			}
-			notifySpaces, err := sandbox.ListNotifySpaces(spaces, apps, instances, 25)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(notifySpaces).To(HaveLen(0))
+			now = time.Now().Truncate(24 * time.Hour)
 		})
 
 		It("skips empty spaces", func() {
-			spaces = []cfclient.Space{
-				{
-					Guid:      "space-guid",
-					CreatedAt: time.Now().Format(time.RFC3339Nano),
-				},
-			}
-			notifySpaces, err := sandbox.ListNotifySpaces(spaces, apps, instances, 25)
+			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(notifySpaces).To(HaveLen(0))
+			Expect(toNotify).To(HaveLen(0))
+			Expect(toPurge).To(HaveLen(0))
 		})
 
-		It("notifies on a recent space with an app", func() {
-			spaces = []cfclient.Space{
-				{
-					Guid:      "space-guid",
-					CreatedAt: time.Now().Add(-30 * 24 * time.Hour).Format(time.RFC3339Nano),
-				},
-			}
+		It("skips spaces with recent resources", func() {
 			apps = []cfclient.App{
 				{
 					Guid:      "app-guid",
 					SpaceGuid: "space-guid",
+					CreatedAt: now.Add(-15 * 24 * time.Hour).Format(time.RFC3339Nano),
 				},
 			}
-			notifySpaces, err := sandbox.ListNotifySpaces(spaces, apps, instances, 25)
+			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(notifySpaces).To(HaveLen(1))
+			Expect(toNotify).To(HaveLen(0))
+			Expect(toPurge).To(HaveLen(0))
 		})
 
-		It("notifies on a recent space with a service instance", func() {
-			spaces = []cfclient.Space{
+		It("skips spaces between thresholds", func() {
+			apps = []cfclient.App{
 				{
-					Guid:      "space-guid",
-					CreatedAt: time.Now().Add(-30 * 24 * time.Hour).Format(time.RFC3339Nano),
+					Guid:      "app-guid",
+					SpaceGuid: "space-guid",
+					CreatedAt: now.Add(-28 * 24 * time.Hour).Format(time.RFC3339Nano),
+				},
+			}
+			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(toNotify).To(HaveLen(0))
+			Expect(toPurge).To(HaveLen(0))
+		})
+
+		It("notifies on the notify threshold", func() {
+			apps = []cfclient.App{
+				{
+					Guid:      "app-guid",
+					SpaceGuid: "space-guid",
+					CreatedAt: now.Add(-25 * 24 * time.Hour).Format(time.RFC3339Nano),
+				},
+			}
+			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(toNotify).To(HaveLen(1))
+			Expect(toPurge).To(HaveLen(0))
+		})
+
+		It("purges on the purge threshold", func() {
+			apps = []cfclient.App{
+				{
+					Guid:      "app-guid",
+					SpaceGuid: "space-guid",
+					CreatedAt: now.Add(-30 * 24 * time.Hour).Format(time.RFC3339Nano),
+				},
+			}
+			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(toNotify).To(HaveLen(0))
+			Expect(toPurge).To(HaveLen(1))
+		})
+
+		It("purges after the purge threshold", func() {
+			apps = []cfclient.App{
+				{
+					Guid:      "app-guid",
+					SpaceGuid: "space-guid",
+					CreatedAt: now.Add(-31 * 24 * time.Hour).Format(time.RFC3339Nano),
+				},
+			}
+			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(toNotify).To(HaveLen(0))
+			Expect(toPurge).To(HaveLen(1))
+		})
+	})
+
+	Describe("GetFirstResource", func() {
+		var (
+			space     cfclient.Space
+			apps      []cfclient.App
+			instances []cfclient.ServiceInstance
+		)
+
+		BeforeEach(func() {
+			space = cfclient.Space{
+				Guid: "space-guid",
+			}
+		})
+
+		It("returns the zero value for an empty space", func() {
+			firstResource, err := sandbox.GetFirstResource(space, apps, instances)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(firstResource.IsZero()).To(BeTrue())
+		})
+
+		It("returns the timestamp of the earliest app", func() {
+			now := time.Now()
+			apps = []cfclient.App{
+				{
+					Guid:      "app-guid",
+					SpaceGuid: "space-guid",
+					CreatedAt: now.Add(-10 * 24 * time.Hour).Format(time.RFC3339Nano),
 				},
 			}
 			instances = []cfclient.ServiceInstance{
 				{
 					Guid:      "instance-guid",
 					SpaceGuid: "space-guid",
+					CreatedAt: now.Add(-5 * 24 * time.Hour).Format(time.RFC3339Nano),
 				},
 			}
-			notifySpaces, err := sandbox.ListNotifySpaces(spaces, apps, instances, 25)
+			firstResource, err := sandbox.GetFirstResource(space, apps, instances)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(notifySpaces).To(HaveLen(1))
+			firstResource.Equal(now.Add(-10 * 24 * time.Hour))
 		})
-	})
 
-	Describe("ListNotifySpaces", func() {
-		var (
-			spaces    []cfclient.Space
-			apps      []cfclient.App
-			instances []cfclient.ServiceInstance
-		)
-
-		It("purges a space with an old app", func() {
-			spaces = []cfclient.Space{
-				{
-					Guid:      "space-guid",
-					CreatedAt: time.Now().Add(-60 * 24 * time.Hour).Format(time.RFC3339Nano),
-				},
-			}
+		It("returns the timestamp of the earliest instance", func() {
+			now := time.Now()
 			apps = []cfclient.App{
 				{
 					Guid:      "app-guid",
 					SpaceGuid: "space-guid",
-					CreatedAt: time.Now().Add(-30 * 24 * time.Hour).Format(time.RFC3339Nano),
-				},
-			}
-			purgeSpaces, err := sandbox.ListPurgeSpaces(spaces, apps, instances, 30, 5)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(purgeSpaces).To(HaveLen(1))
-		})
-
-		It("purges a space with an old instance", func() {
-			spaces = []cfclient.Space{
-				{
-					Guid:      "space-guid",
-					CreatedAt: time.Now().Add(-60 * 24 * time.Hour).Format(time.RFC3339Nano),
+					CreatedAt: now.Add(-5 * 24 * time.Hour).Format(time.RFC3339Nano),
 				},
 			}
 			instances = []cfclient.ServiceInstance{
 				{
-					Guid:      "app-guid",
+					Guid:      "instance-guid",
 					SpaceGuid: "space-guid",
-					CreatedAt: time.Now().Add(-30 * 24 * time.Hour).Format(time.RFC3339Nano),
+					CreatedAt: now.Add(-10 * 24 * time.Hour).Format(time.RFC3339Nano),
 				},
 			}
-			purgeSpaces, err := sandbox.ListPurgeSpaces(spaces, apps, instances, 30, 5)
+			firstResource, err := sandbox.GetFirstResource(space, apps, instances)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(purgeSpaces).To(HaveLen(1))
-		})
-
-		It("skips a space with a new app", func() {
-			spaces = []cfclient.Space{
-				{
-					Guid:      "space-guid",
-					CreatedAt: time.Now().Add(-60 * 24 * time.Hour).Format(time.RFC3339Nano),
-				},
-			}
-			apps = []cfclient.App{
-				{
-					Guid:      "app-guid",
-					SpaceGuid: "space-guid",
-					CreatedAt: time.Now().Add(-1 * 24 * time.Hour).Format(time.RFC3339Nano),
-				},
-			}
-			purgeSpaces, err := sandbox.ListPurgeSpaces(spaces, apps, instances, 30, 5)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(purgeSpaces).To(HaveLen(0))
+			firstResource.Equal(now.Add(-10 * 24 * time.Hour))
 		})
 	})
 })

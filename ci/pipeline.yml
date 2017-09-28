@@ -22,15 +22,15 @@ jobs:
       CLIENT_SECRET: {{client-secret-staging}}
       ORG_PREFIX: {{org-prefix}}
       NOTIFY_DAYS: {{notify-days}}
-      PURGE_CREATE_DAYS: {{purge-create-days}}
-      PURGE_ACTIVITY_DAYS: {{purge-activity-days}}
+      PURGE_DAYS: {{purge-days}}
+      NOTIFY_MAIL_SUBJECT: {{notify-subject}}
+      PURGE_MAIL_SUBJECT: {{purge-subject}}
       SMTP_HOST: {{smtp-host}}
       SMTP_USER: {{smtp-user}}
       SMTP_PASS: {{smtp-pass}}
       SMTP_PORT: {{smtp-port}}
       MAIL_SENDER: {{sender}}
-      NOTIFY_MAIL_SUBJECT: {{notify-subject}}
-      PURGE_MAIL_SUBJECT: {{purge-subject}}
+      DRY_RUN: {{dry-run}}
   on_failure:
     put: slack
     params: &slack-params
@@ -63,15 +63,15 @@ jobs:
       CLIENT_SECRET: {{client-secret-production}}
       ORG_PREFIX: {{org-prefix}}
       NOTIFY_DAYS: {{notify-days}}
-      PURGE_CREATE_DAYS: {{purge-create-days}}
-      PURGE_ACTIVITY_DAYS: {{purge-activity-days}}
+      PURGE_DAYS: {{purge-days}}
+      NOTIFY_MAIL_SUBJECT: {{notify-subject}}
+      PURGE_MAIL_SUBJECT: {{purge-subject}}
       SMTP_HOST: {{smtp-host}}
       SMTP_USER: {{smtp-user}}
       SMTP_PASS: {{smtp-pass}}
       SMTP_PORT: {{smtp-port}}
       MAIL_SENDER: {{sender}}
-      NOTIFY_MAIL_SUBJECT: {{notify-subject}}
-      PURGE_MAIL_SUBJECT: {{purge-subject}}
+      DRY_RUN: {{dry-run}}
   on_failure:
     put: slack
     params:

@@ -82,33 +82,7 @@ func ListSandboxOrgs(client *cfclient.Client, prefix string) ([]cfclient.Org, er
 		}
 	}
 
-	return []cfclient.Org{}, nil
-}
-
-func groupAppsBySpace(apps []cfclient.App) map[string][]cfclient.App {
-	grouped := map[string][]cfclient.App{}
-
-	for _, app := range apps {
-		if _, ok := grouped[app.SpaceGuid]; !ok {
-			grouped[app.SpaceGuid] = []cfclient.App{}
-		}
-		grouped[app.SpaceGuid] = append(grouped[app.SpaceGuid], app)
-	}
-
-	return grouped
-}
-
-func groupInstancesBySpace(instances []cfclient.ServiceInstance) map[string][]cfclient.ServiceInstance {
-	grouped := map[string][]cfclient.ServiceInstance{}
-
-	for _, instance := range instances {
-		if _, ok := grouped[instance.SpaceGuid]; !ok {
-			grouped[instance.SpaceGuid] = []cfclient.ServiceInstance{}
-		}
-		grouped[instance.SpaceGuid] = append(grouped[instance.SpaceGuid], instance)
-	}
-
-	return grouped
+	return sandboxes, nil
 }
 
 func ListOrgResources(
@@ -140,78 +114,91 @@ func ListOrgResources(
 	return
 }
 
-func ListNotifySpaces(
-	spaces []cfclient.Space,
+func GetFirstResource(
+	space cfclient.Space,
 	apps []cfclient.App,
 	instances []cfclient.ServiceInstance,
-	threshold int,
-) ([]cfclient.Space, error) {
-	toNotify := []cfclient.Space{}
-	now := time.Now()
-
+) (time.Time, error) {
 	groupedApps := groupAppsBySpace(apps)
 	groupedInstances := groupInstancesBySpace(instances)
 
-	for _, space := range spaces {
-		createdAt, err := time.Parse(time.RFC3339Nano, space.CreatedAt)
+	var firstResource time.Time
+	for _, app := range groupedApps[space.Guid] {
+		createdAt, err := time.Parse(time.RFC3339Nano, app.CreatedAt)
 		if err != nil {
-			return toNotify, err
+			return firstResource, err
 		}
-
-		if now.Sub(createdAt) > time.Duration(threshold*24)*time.Hour {
-			if len(groupedApps[space.Guid]) > 0 || len(groupedInstances[space.Guid]) > 0 {
-				toNotify = append(toNotify, space)
-			}
+		if firstResource.IsZero() || createdAt.Before(firstResource) {
+			firstResource = createdAt
+		}
+	}
+	for _, instance := range groupedInstances[space.Guid] {
+		createdAt, err := time.Parse(time.RFC3339Nano, instance.CreatedAt)
+		if err != nil {
+			return firstResource, err
+		}
+		if firstResource.IsZero() || createdAt.Before(firstResource) {
+			firstResource = createdAt
 		}
 	}
 
-	return toNotify, nil
+	return firstResource, nil
 }
 
 func ListPurgeSpaces(
 	spaces []cfclient.Space,
 	apps []cfclient.App,
 	instances []cfclient.ServiceInstance,
-	spaceThreshold, activityThreshold int,
-) ([]cfclient.Space, error) {
-	toPurge := []cfclient.Space{}
-	now := time.Now()
-
-	groupedApps := groupAppsBySpace(apps)
-	groupedInstances := groupInstancesBySpace(instances)
-
+	now time.Time,
+	notifyThreshold float64,
+	purgeThreshold float64,
+) (
+	toNotify []cfclient.Space,
+	toPurge []cfclient.Space,
+	err error,
+) {
+	var firstResource time.Time
 	for _, space := range spaces {
-		createdAt, err := time.Parse(time.RFC3339Nano, space.CreatedAt)
+		firstResource, err = GetFirstResource(space, apps, instances)
 		if err != nil {
-			return toPurge, err
+			return
 		}
-		lastUpdated := createdAt
-		if now.Sub(createdAt) > time.Duration(spaceThreshold*24)*time.Hour {
-			for _, app := range groupedApps[space.Guid] {
-				appCreatedAt, err := time.Parse(time.RFC3339Nano, app.CreatedAt)
-				if err != nil {
-					return toPurge, err
-				}
-				if appCreatedAt.Unix() > lastUpdated.Unix() {
-					lastUpdated = appCreatedAt
-				}
-			}
+		if firstResource.IsZero() {
+			continue
+		}
 
-			for _, instance := range groupedInstances[space.Guid] {
-				instanceCreatedAt, err := time.Parse(time.RFC3339Nano, instance.CreatedAt)
-				if err != nil {
-					return toPurge, err
-				}
-				if instanceCreatedAt.Unix() > lastUpdated.Unix() {
-					lastUpdated = instanceCreatedAt
-				}
-			}
-
-			if now.Sub(lastUpdated) > time.Duration(activityThreshold*24)*time.Hour {
-				toPurge = append(toPurge, space)
-			}
+		delta := now.Sub(firstResource.Truncate(24*time.Hour)).Hours() / 24
+		if delta == notifyThreshold {
+			toNotify = append(toNotify, space)
+		} else if delta >= purgeThreshold {
+			toPurge = append(toPurge, space)
 		}
 	}
+	return
+}
 
-	return toPurge, nil
+func groupAppsBySpace(apps []cfclient.App) map[string][]cfclient.App {
+	grouped := map[string][]cfclient.App{}
+
+	for _, app := range apps {
+		if _, ok := grouped[app.SpaceGuid]; !ok {
+			grouped[app.SpaceGuid] = []cfclient.App{}
+		}
+		grouped[app.SpaceGuid] = append(grouped[app.SpaceGuid], app)
+	}
+
+	return grouped
+}
+
+func groupInstancesBySpace(instances []cfclient.ServiceInstance) map[string][]cfclient.ServiceInstance {
+	grouped := map[string][]cfclient.ServiceInstance{}
+
+	for _, instance := range instances {
+		if _, ok := grouped[instance.SpaceGuid]; !ok {
+			grouped[instance.SpaceGuid] = []cfclient.ServiceInstance{}
+		}
+		grouped[instance.SpaceGuid] = append(grouped[instance.SpaceGuid], instance)
+	}
+
+	return grouped
 }

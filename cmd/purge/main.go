@@ -3,6 +3,7 @@ package main
 import (
 	"html/template"
 	"log"
+	"time"
 
 	"github.com/cloudfoundry-community/go-cfclient"
 	"github.com/kelseyhightower/envconfig"
@@ -11,16 +12,16 @@ import (
 )
 
 type Options struct {
-	APIAddress        string `envconfig:"api_address" required:"true"`
-	ClientID          string `envconfig:"client_id" required:"true"`
-	ClientSecret      string `envconfig:"client_secret" required:"true"`
-	OrgPrefix         string `envconfig:"org_prefix" required:"true"`
-	NotifyDays        int    `envconfig:"notify_days" default:"25"`
-	PurgeCreateDays   int    `envconfig:"purge_create_days" default:"30"`
-	PurgeActivityDays int    `envconfig:"purge_activity_days" default:"5"`
-	MailSender        string `envconfig:"mail_sender" required:"true"`
-	NotifyMailSubject string `envconfig:"notify_mail_subject" required:"true"`
-	PurgeMailSubject  string `envconfig:"purge_mail_subject" required:"true"`
+	APIAddress        string  `envconfig:"api_address" required:"true"`
+	ClientID          string  `envconfig:"client_id" required:"true"`
+	ClientSecret      string  `envconfig:"client_secret" required:"true"`
+	OrgPrefix         string  `envconfig:"org_prefix" required:"true"`
+	NotifyDays        float64 `envconfig:"notify_days" default:"25"`
+	PurgeDays         float64 `envconfig:"purge_create_days" default:"30"`
+	MailSender        string  `envconfig:"mail_sender" required:"true"`
+	NotifyMailSubject string  `envconfig:"notify_mail_subject" required:"true"`
+	PurgeMailSubject  string  `envconfig:"purge_mail_subject" required:"true"`
+	DryRun            bool    `envconfig:"dry_run" default:"true"`
 	sandbox.SMTPOptions
 }
 
@@ -54,42 +55,45 @@ func main() {
 		log.Fatalf("error getting orgs: %s", err.Error())
 	}
 
+	now := time.Now().Truncate(24 * time.Hour)
+
 	for _, org := range orgs {
 		spaces, apps, instances, err := sandbox.ListOrgResources(client, org)
 		if err != nil {
 			log.Fatalf("error listing org resources for org %s: %s", org.Name, err.Error())
 		}
 
-		// Notify owners of spaces to be purged
-		toNotify, err := sandbox.ListNotifySpaces(spaces, apps, instances, opts.NotifyDays)
+		toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, opts.NotifyDays, opts.PurgeDays)
 		if err != nil {
-			log.Fatalf("error getting spaces to purge for org %s: %s", org.Name, err.Error())
+			log.Fatalf("error listing spaces to purge for org %s: %s", org.Name, err.Error())
 		}
+
 		for _, space := range toNotify {
 			recipients, err := sandbox.ListRecipients(space)
 			if err != nil {
 				log.Fatalf("error listing recipients on space %s: %s", space.Name, err.Error())
 			}
-			if err := sandbox.SendMail(opts.SMTPOptions, opts.MailSender, opts.NotifyMailSubject, notifyTemplate, space, recipients); err != nil {
-				log.Fatalf("error sending mail on space %s: %s", space.Name, err.Error())
+			log.Printf("Notifying space %s; recipients %+v", recipients, space.Name)
+			if !opts.DryRun {
+				if err := sandbox.SendMail(opts.SMTPOptions, opts.MailSender, opts.NotifyMailSubject, notifyTemplate, space, recipients); err != nil {
+					log.Fatalf("error sending mail on space %s: %s", space.Name, err.Error())
+				}
 			}
 		}
 
-		// Purge spaces
-		toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, opts.PurgeCreateDays, opts.PurgeActivityDays)
-		if err != nil {
-			log.Fatalf("error getting spaces to purge for org %s: %s", org.Name, err.Error())
-		}
 		for _, space := range toPurge {
 			recipients, err := sandbox.ListRecipients(space)
 			if err != nil {
 				log.Fatalf("error listing recipients on space %s: %s", space.Name, err.Error())
 			}
-			if err := sandbox.SendMail(opts.SMTPOptions, opts.MailSender, opts.PurgeMailSubject, purgeTemplate, space, recipients); err != nil {
-				log.Fatalf("error sending mail on space %s: %s", space.Name, err.Error())
-			}
-			if err := client.DeleteSpace(space.Guid, true, true); err != nil {
-				log.Fatalf("error deleting space %s: %s", space.Name, err.Error())
+			log.Printf("Purging space %s; recipients %+v", recipients, space.Name)
+			if !opts.DryRun {
+				if err := sandbox.SendMail(opts.SMTPOptions, opts.MailSender, opts.PurgeMailSubject, purgeTemplate, space, recipients); err != nil {
+					log.Fatalf("error sending mail on space %s: %s", space.Name, err.Error())
+				}
+				if err := client.DeleteSpace(space.Guid, true, true); err != nil {
+					log.Fatalf("error deleting space %s: %s", space.Name, err.Error())
+				}
 			}
 		}
 	}
