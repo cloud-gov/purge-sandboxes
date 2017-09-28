@@ -40,13 +40,11 @@ func SendMail(
 	sender string,
 	subject string,
 	tmpl *template.Template,
-	space cfclient.Space,
+	data map[string]interface{},
 	recipients []string,
 ) error {
 	b := bytes.Buffer{}
-	if err := tmpl.Execute(&b, map[string]interface{}{
-		"space": space,
-	}); err != nil {
+	if err := tmpl.Execute(&b, data); err != nil {
 		return err
 	}
 
