@@ -3,6 +3,7 @@ package sandbox
 import (
 	"bytes"
 	"html/template"
+	"log"
 	"net/mail"
 	"net/url"
 	"strings"
@@ -56,6 +57,10 @@ func SendMail(
 	body string,
 	recipients []string,
 ) error {
+	if len(recipients) == 0 {
+		return nil
+	}
+
 	d := gomail.NewDialer(opts.SMTPHost, opts.SMTPPort, opts.SMTPUser, opts.SMTPPass)
 	s, err := d.Dial()
 	if err != nil {
@@ -181,6 +186,8 @@ func ListPurgeSpaces(
 		} else if delta >= purgeThreshold {
 			toPurge = append(toPurge, space)
 		}
+
+		log.Printf("space %s has timestamp %s and delta", space.Name, firstResource, delta)
 	}
 	return
 }

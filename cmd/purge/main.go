@@ -1,8 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"html/template"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/cloudfoundry-community/go-cfclient"
@@ -66,6 +68,8 @@ func main() {
 		}
 	}
 
+	var purgeErrors []string
+
 	for _, org := range orgs {
 		spaces, apps, instances, err := sandbox.ListOrgResources(client, org)
 		if err != nil {
@@ -118,19 +122,26 @@ func main() {
 					log.Fatalf("error sending mail on space %s: %s", space.Name, err.Error())
 				}
 				log.Printf("deleting and recreating space %s", space.Name)
-				if err := client.DeleteSpace(space.Guid, true, true); err != nil {
-					log.Fatalf("error deleting space %s: %s", space.Name, err.Error())
-				}
-				if _, err := client.CreateSpace(cfclient.SpaceRequest{
-					Name:              space.Name,
-					OrganizationGuid:  space.OrganizationGuid,
-					SpaceQuotaDefGuid: []string{space.QuotaDefinitionGuid},
-					DeveloperGuid:     developers,
-					ManagerGuid:       managers,
-				}); err != nil {
-					log.Fatalf("error recreating space %s: %s", space.Name, err.Error())
+				if err := client.DeleteSpace(space.Guid, true, false); err != nil {
+					purgeErrors = append(purgeErrors, fmt.Sprintf("error purging space %s in org %s: %s", space.Name, org.Name, err.Error()))
+				} else {
+					spaceRequest := cfclient.SpaceRequest{
+						Name:              space.Name,
+						OrganizationGuid:  space.OrganizationGuid,
+						SpaceQuotaDefGuid: []string{space.QuotaDefinitionGuid},
+						DeveloperGuid:     developers,
+						ManagerGuid:       managers,
+					}
+					log.Printf("recreating space: %+v", spaceRequest)
+					if _, err := client.CreateSpace(spaceRequest); err != nil {
+						log.Fatalf("error recreating space %s: %s", space.Name, err.Error())
+					}
 				}
 			}
 		}
+	}
+
+	if len(purgeErrors) > 0 {
+		log.Fatalf("error(s) purging sandboxes: %s", strings.Join(purgeErrors, ", "))
 	}
 }
