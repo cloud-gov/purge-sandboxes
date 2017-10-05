@@ -22,6 +22,7 @@ type Options struct {
 	NotifyMailSubject string `envconfig:"notify_mail_subject" required:"true"`
 	PurgeMailSubject  string `envconfig:"purge_mail_subject" required:"true"`
 	DryRun            bool   `envconfig:"dry_run" default:"true"`
+	TimeStartsAt      string `envconfig:"time_starts_at"`
 	sandbox.SMTPOptions
 }
 
@@ -57,17 +58,26 @@ func main() {
 
 	now := time.Now().Truncate(24 * time.Hour)
 
+	var timeStartsAt time.Time
+	if opts.TimeStartsAt != "" {
+		timeStartsAt, err = time.Parse(time.RFC3339Nano, opts.TimeStartsAt)
+		if err != nil {
+			log.Fatalf("error parsing time starts at: %s", err.Error())
+		}
+	}
+
 	for _, org := range orgs {
 		spaces, apps, instances, err := sandbox.ListOrgResources(client, org)
 		if err != nil {
 			log.Fatalf("error listing org resources for org %s: %s", org.Name, err.Error())
 		}
 
-		toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, opts.NotifyDays, opts.PurgeDays)
+		toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, opts.NotifyDays, opts.PurgeDays, timeStartsAt)
 		if err != nil {
 			log.Fatalf("error listing spaces to purge for org %s: %s", org.Name, err.Error())
 		}
 
+		log.Printf("notifying %d spaces in org %s", len(toNotify), org.Name)
 		for _, space := range toNotify {
 			recipients, _, _, err := sandbox.ListRecipients(space)
 			if err != nil {
@@ -90,6 +100,7 @@ func main() {
 			}
 		}
 
+		log.Printf("purging %d spaces in org %s", len(toPurge), org.Name)
 		for _, space := range toPurge {
 			recipients, developers, managers, err := sandbox.ListRecipients(space)
 			if err != nil {

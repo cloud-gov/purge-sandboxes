@@ -30,6 +30,7 @@ jobs:
       SMTP_PASS: {{smtp-pass}}
       SMTP_PORT: {{smtp-port}}
       MAIL_SENDER: {{sender}}
+      TIME_STARTS_AT: {{time-starts-at-staging}}
       DRY_RUN: {{dry-run}}
   on_failure:
     put: slack
@@ -71,6 +72,7 @@ jobs:
       SMTP_PASS: {{smtp-pass}}
       SMTP_PORT: {{smtp-port}}
       MAIL_SENDER: {{sender}}
+      TIME_STARTS_AT: {{time-starts-at-production}}
       DRY_RUN: {{dry-run}}
   on_failure:
     put: slack

@@ -156,6 +156,7 @@ func ListPurgeSpaces(
 	now time.Time,
 	notifyThreshold int,
 	purgeThreshold int,
+	timeStartsAt time.Time,
 ) (
 	toNotify []cfclient.Space,
 	toPurge []cfclient.Space,
@@ -169,6 +170,9 @@ func ListPurgeSpaces(
 		}
 		if firstResource.IsZero() {
 			continue
+		}
+		if timeStartsAt.After(firstResource) {
+			firstResource = timeStartsAt
 		}
 
 		delta := int(now.Sub(firstResource.Truncate(24*time.Hour)).Hours() / 24)
