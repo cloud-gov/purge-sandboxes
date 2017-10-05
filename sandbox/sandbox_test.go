@@ -28,7 +28,7 @@ var _ = Describe("Sandbox", func() {
 		})
 
 		It("skips empty spaces", func() {
-			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30)
+			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(toNotify).To(HaveLen(0))
 			Expect(toPurge).To(HaveLen(0))
@@ -42,7 +42,7 @@ var _ = Describe("Sandbox", func() {
 					CreatedAt: now.Add(-15 * 24 * time.Hour).Format(time.RFC3339Nano),
 				},
 			}
-			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30)
+			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(toNotify).To(HaveLen(0))
 			Expect(toPurge).To(HaveLen(0))
@@ -56,7 +56,7 @@ var _ = Describe("Sandbox", func() {
 					CreatedAt: now.Add(-28 * 24 * time.Hour).Format(time.RFC3339Nano),
 				},
 			}
-			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30)
+			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(toNotify).To(HaveLen(0))
 			Expect(toPurge).To(HaveLen(0))
@@ -70,7 +70,7 @@ var _ = Describe("Sandbox", func() {
 					CreatedAt: now.Add(-25 * 24 * time.Hour).Format(time.RFC3339Nano),
 				},
 			}
-			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30)
+			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(toNotify).To(HaveLen(1))
 			Expect(toPurge).To(HaveLen(0))
@@ -84,7 +84,7 @@ var _ = Describe("Sandbox", func() {
 					CreatedAt: now.Add(-30 * 24 * time.Hour).Format(time.RFC3339Nano),
 				},
 			}
-			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30)
+			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(toNotify).To(HaveLen(0))
 			Expect(toPurge).To(HaveLen(1))
@@ -98,10 +98,38 @@ var _ = Describe("Sandbox", func() {
 					CreatedAt: now.Add(-31 * 24 * time.Hour).Format(time.RFC3339Nano),
 				},
 			}
-			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30)
+			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(toNotify).To(HaveLen(0))
 			Expect(toPurge).To(HaveLen(1))
+		})
+
+		It("purges after the purge threshold when time starts in the past", func() {
+			apps = []cfclient.App{
+				{
+					Guid:      "app-guid",
+					SpaceGuid: "space-guid",
+					CreatedAt: now.Add(-31 * 24 * time.Hour).Format(time.RFC3339Nano),
+				},
+			}
+			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, now.Add(-60*24*time.Hour))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(toNotify).To(HaveLen(0))
+			Expect(toPurge).To(HaveLen(1))
+		})
+
+		It("skips purge when time starts after last timestamp", func() {
+			apps = []cfclient.App{
+				{
+					Guid:      "app-guid",
+					SpaceGuid: "space-guid",
+					CreatedAt: now.Add(-31 * 24 * time.Hour).Format(time.RFC3339Nano),
+				},
+			}
+			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, now)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(toNotify).To(HaveLen(0))
+			Expect(toPurge).To(HaveLen(0))
 		})
 	})
 
