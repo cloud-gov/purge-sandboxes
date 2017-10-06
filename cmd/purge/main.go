@@ -125,16 +125,18 @@ func main() {
 				if err := client.DeleteSpace(space.Guid, true, false); err != nil {
 					purgeErrors = append(purgeErrors, fmt.Sprintf("error purging space %s in org %s: %s", space.Name, org.Name, err.Error()))
 				} else {
-					spaceRequest := cfclient.SpaceRequest{
-						Name:              space.Name,
-						OrganizationGuid:  space.OrganizationGuid,
-						SpaceQuotaDefGuid: []string{space.QuotaDefinitionGuid},
-						DeveloperGuid:     developers,
-						ManagerGuid:       managers,
-					}
-					log.Printf("recreating space: %+v", spaceRequest)
-					if _, err := client.CreateSpace(spaceRequest); err != nil {
-						log.Fatalf("error recreating space %s: %s", space.Name, err.Error())
+					if len(developers) > 0 || len(managers) > 0 {
+						spaceRequest := cfclient.SpaceRequest{
+							Name:              space.Name,
+							OrganizationGuid:  space.OrganizationGuid,
+							SpaceQuotaDefGuid: space.QuotaDefinitionGuid,
+							DeveloperGuid:     developers,
+							ManagerGuid:       managers,
+						}
+						log.Printf("recreating space: %+v", spaceRequest)
+						if _, err := client.CreateSpace(spaceRequest); err != nil {
+							log.Fatalf("error recreating space %s: %s", space.Name, err.Error())
+						}
 					}
 				}
 			}
