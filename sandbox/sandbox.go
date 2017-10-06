@@ -2,6 +2,7 @@ package sandbox
 
 import (
 	"bytes"
+	"fmt"
 	"html/template"
 	"log"
 	"net/mail"
@@ -43,6 +44,24 @@ func ListRecipients(space cfclient.Space) (addresses, developers, managers []str
 		}
 	}
 	return
+}
+
+func PurgeSpace(client *cfclient.Client, space cfclient.Space) error {
+	spaceErr := client.DeleteSpace(space.Guid, true, false)
+	if spaceErr != nil {
+		query := url.Values(map[string][]string{"q": []string{fmt.Sprintf("space_guid:%s", space.Guid)}})
+		apps, err := client.ListAppsByQuery(query)
+		if err != nil {
+			return err
+		}
+		for _, app := range apps {
+			if err := client.DeleteApp(app.Guid); err != nil {
+				return err
+			}
+		}
+		return spaceErr
+	}
+	return nil
 }
 
 func RenderTemplate(tmpl *template.Template, data map[string]interface{}) (string, error) {

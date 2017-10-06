@@ -19,7 +19,7 @@ type Options struct {
 	ClientSecret      string `envconfig:"client_secret" required:"true"`
 	OrgPrefix         string `envconfig:"org_prefix" required:"true"`
 	NotifyDays        int    `envconfig:"notify_days" default:"25"`
-	PurgeDays         int    `envconfig:"purge_create_days" default:"30"`
+	PurgeDays         int    `envconfig:"purge_days" default:"30"`
 	MailSender        string `envconfig:"mail_sender" required:"true"`
 	NotifyMailSubject string `envconfig:"notify_mail_subject" required:"true"`
 	PurgeMailSubject  string `envconfig:"purge_mail_subject" required:"true"`
@@ -122,7 +122,7 @@ func main() {
 					log.Fatalf("error sending mail on space %s: %s", space.Name, err.Error())
 				}
 				log.Printf("deleting and recreating space %s", space.Name)
-				if err := client.DeleteSpace(space.Guid, true, false); err != nil {
+				if err := sandbox.PurgeSpace(client, space); err != nil {
 					purgeErrors = append(purgeErrors, fmt.Sprintf("error purging space %s in org %s: %s", space.Name, org.Name, err.Error()))
 				} else {
 					if len(developers) > 0 || len(managers) > 0 {
