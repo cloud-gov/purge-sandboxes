@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
-	"log"
 	"net/mail"
 	"net/url"
 	"strings"
@@ -176,6 +175,11 @@ func GetFirstResource(
 	return firstResource, nil
 }
 
+type SpaceDetails struct {
+	Timestamp time.Time
+	Space     cfclient.Space
+}
+
 func ListPurgeSpaces(
 	spaces []cfclient.Space,
 	apps []cfclient.App,
@@ -185,8 +189,8 @@ func ListPurgeSpaces(
 	purgeThreshold int,
 	timeStartsAt time.Time,
 ) (
-	toNotify []cfclient.Space,
-	toPurge []cfclient.Space,
+	toNotify []SpaceDetails,
+	toPurge []SpaceDetails,
 	err error,
 ) {
 	var firstResource time.Time
@@ -202,14 +206,13 @@ func ListPurgeSpaces(
 			firstResource = timeStartsAt
 		}
 
-		delta := int(now.Sub(firstResource.Truncate(24*time.Hour)).Hours() / 24)
-		if delta == notifyThreshold {
-			toNotify = append(toNotify, space)
-		} else if delta >= purgeThreshold {
-			toPurge = append(toPurge, space)
+		firstResource := firstResource.Truncate(24 * time.Hour)
+		delta := int(now.Sub(firstResource).Hours() / 24)
+		if delta >= purgeThreshold {
+			toPurge = append(toPurge, SpaceDetails{firstResource, space})
+		} else if delta >= notifyThreshold {
+			toNotify = append(toNotify, SpaceDetails{firstResource, space})
 		}
-
-		log.Printf("space %s has timestamp %s and delta", space.Name, firstResource, delta)
 	}
 	return
 }

@@ -48,7 +48,7 @@ var _ = Describe("Sandbox", func() {
 			Expect(toPurge).To(HaveLen(0))
 		})
 
-		It("skips spaces between thresholds", func() {
+		It("notifies on spaces between thresholds", func() {
 			apps = []cfclient.App{
 				{
 					Guid:      "app-guid",
@@ -58,7 +58,7 @@ var _ = Describe("Sandbox", func() {
 			}
 			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
 			Expect(err).NotTo(HaveOccurred())
-			Expect(toNotify).To(HaveLen(0))
+			Expect(toNotify).To(HaveLen(1))
 			Expect(toPurge).To(HaveLen(0))
 		})
 
