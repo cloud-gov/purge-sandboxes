@@ -1,13 +1,16 @@
-You're receiving this message because you have content in a cloud.gov sandbox that is approaching 90 days old.
+{{define "content"}}
+<p>You're receiving this message because you have content in a cloud.gov sandbox that is approaching 90 days old.</p>
 
-Sandboxes are usable for 90 days to help you evaluate whether cloud.gov is a good fit for your needs, but they're not suitable for long-lived
+<p>Sandboxes are usable for 90 days to help you evaluate whether cloud.gov is a good fit for your needs, but they're not suitable for long-lived
 or production applications.
-<a href="https://cloud.gov/overview/pricing/free-limited-sandbox/">Learn more about policies for sandbox usage</a>.
+<a href="https://cloud.gov/overview/pricing/free-limited-sandbox/">Learn more about policies for sandbox usage</a>.</p>
 
-On {{.date.Format "2006 Jan 02"}}, we'll delete all applications, service instances, routes, etc., in the {{org.Name}}/{{.space.Name}} space.
+
+<p>On {{.date.Format "Jan 02, 2006"}}, we'll delete all applications, service instances, routes, etc., in the {{.org.Name}}/{{.space.Name}} space.
 Deleting the content of the sandbox resets the clock; you can start a new 90-day evaluation period just by creating a new app or service
-instance in the empty space.
+instance in the empty space.</p>
 
-We hope you've found the sandbox helpful.
+<p>We hope you've found the sandbox helpful.
 If you'd like to host longer-lived content on cloud.gov, you'll need to do it as part of a <a href="https://cloud.gov/overview/pricing/rates/">prototyping or production package</a>.
-Please <a href="https://cloud.gov/docs/help/">contact us</a> to learn how to purchase one of these packages.
+Please <a href="https://cloud.gov/docs/help/">contact us</a> to learn how to purchase one of these packages.</p>
+{{end}}

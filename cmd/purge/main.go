@@ -34,12 +34,12 @@ func main() {
 		log.Fatalf("error parsing options: %s", err.Error())
 	}
 
-	notifyTemplate, err := template.ParseFiles("./notify.tmpl")
+	notifyTemplate, err := template.ParseFiles("./base.html", "./notify.tmpl")
 	if err != nil {
 		log.Fatalf("error reading notify template: %s", err.Error())
 	}
 
-	purgeTemplate, err := template.ParseFiles("./purge.tmpl")
+	purgeTemplate, err := template.ParseFiles("./base.html", "./purge.tmpl")
 	if err != nil {
 		log.Fatalf("error reading purge template: %s", err.Error())
 	}
