@@ -13,6 +13,7 @@ import (
 	"github.com/18F/cg-sandbox/sandbox"
 )
 
+// Options describes common configuration
 type Options struct {
 	APIAddress        string `envconfig:"api_address" required:"true"`
 	ClientID          string `envconfig:"client_id" required:"true"`

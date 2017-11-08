@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
-	"log"
 	"net/mail"
 	"net/url"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"gopkg.in/gomail.v2"
 )
 
+// SMTPOptions describes configation for sending mail via SMTP
 type SMTPOptions struct {
 	SMTPHost string `envconfig:"smtp_host" required:"true"`
 	SMTPPort int    `envconfig:"smtp_port" default:"587"`
@@ -46,6 +46,7 @@ func ListRecipients(space cfclient.Space) (addresses, developers, managers []str
 	return
 }
 
+// PurgeSpace deletes a space; if the delete fails, it deletes all applications within the space
 func PurgeSpace(client *cfclient.Client, space cfclient.Space) error {
 	spaceErr := client.DeleteSpace(space.Guid, true, false)
 	if spaceErr != nil {
@@ -64,6 +65,7 @@ func PurgeSpace(client *cfclient.Client, space cfclient.Space) error {
 	return nil
 }
 
+// RenderTemplate renders a template to string
 func RenderTemplate(tmpl *template.Template, data map[string]interface{}) (string, error) {
 	buf := bytes.Buffer{}
 	if err := tmpl.Execute(&buf, data); err != nil {
@@ -72,6 +74,7 @@ func RenderTemplate(tmpl *template.Template, data map[string]interface{}) (strin
 	return buf.String(), nil
 }
 
+// SendMail sends email via SMTP
 func SendMail(
 	opts SMTPOptions,
 	sender string,
@@ -99,6 +102,7 @@ func SendMail(
 	return gomail.Send(s, m)
 }
 
+// ListSandboxOrgs lists all sandbox organizations
 func ListSandboxOrgs(client *cfclient.Client, prefix string) ([]cfclient.Org, error) {
 	sandboxes := []cfclient.Org{}
 
@@ -116,6 +120,7 @@ func ListSandboxOrgs(client *cfclient.Client, prefix string) ([]cfclient.Org, er
 	return sandboxes, nil
 }
 
+// ListOrgResources fetches apps, service instances, and spaces within an organization
 func ListOrgResources(
 	client *cfclient.Client,
 	org cfclient.Org,
@@ -145,6 +150,7 @@ func ListOrgResources(
 	return
 }
 
+// GetFirstResource gets the creation timestamp of the earliest-created resource in a space
 func GetFirstResource(
 	space cfclient.Space,
 	apps []cfclient.App,
@@ -176,6 +182,7 @@ func GetFirstResource(
 	return firstResource, nil
 }
 
+// ListPurgeSpaces identifies spaces that will be notified or purged
 func ListPurgeSpaces(
 	spaces []cfclient.Space,
 	apps []cfclient.App,
@@ -208,8 +215,6 @@ func ListPurgeSpaces(
 		} else if delta >= purgeThreshold {
 			toPurge = append(toPurge, space)
 		}
-
-		log.Printf("space %s has timestamp %s and delta", space.Name, firstResource, delta)
 	}
 	return
 }
