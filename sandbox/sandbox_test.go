@@ -206,7 +206,7 @@ var _ = Describe("Sandbox", func() {
 		)
 		Context("NotifyTemplate", func() {
 			BeforeEach(func() {
-				tpl, err = template.ParseFiles("../base.html", "../notify.tmpl")
+				tpl, err = template.ParseFiles("../templates/base.html", "../templates/notify.tmpl")
 				data = map[string]interface{}{
 					"org": cfclient.Org{
 						Name: "test-org",
@@ -215,6 +215,7 @@ var _ = Describe("Sandbox", func() {
 						Name: "test-space",
 					},
 					"date": time.Date(2009, 11, 17, 20, 34, 58, 651387237, time.UTC),
+					"days": 90,
 				}
 				expectedTestFile = "../testdata/notify.html"
 				Expect(err).NotTo(HaveOccurred())
@@ -233,7 +234,7 @@ var _ = Describe("Sandbox", func() {
 		})
 		Context("PurgeTemplate", func() {
 			BeforeEach(func() {
-				tpl, err = template.ParseFiles("../base.html", "../purge.tmpl")
+				tpl, err = template.ParseFiles("../templates/base.html", "../templates/purge.tmpl")
 				data = map[string]interface{}{
 					"org": cfclient.Org{
 						Name: "test-org",
@@ -242,6 +243,7 @@ var _ = Describe("Sandbox", func() {
 						Name: "test-space",
 					},
 					"date": time.Date(2009, 11, 17, 20, 34, 58, 651387237, time.UTC),
+					"days": 90,
 				}
 				expectedTestFile = "../testdata/purge.html"
 				Expect(err).NotTo(HaveOccurred())

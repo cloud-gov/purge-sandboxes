@@ -34,12 +34,12 @@ func main() {
 		log.Fatalf("error parsing options: %s", err.Error())
 	}
 
-	notifyTemplate, err := template.ParseFiles("./base.html", "./notify.tmpl")
+	notifyTemplate, err := template.ParseFiles("./templates/base.html", "./templates/notify.tmpl")
 	if err != nil {
 		log.Fatalf("error reading notify template: %s", err.Error())
 	}
 
-	purgeTemplate, err := template.ParseFiles("./base.html", "./purge.tmpl")
+	purgeTemplate, err := template.ParseFiles("./templates/base.html", "./templates/purge.tmpl")
 	if err != nil {
 		log.Fatalf("error reading purge template: %s", err.Error())
 	}
@@ -93,6 +93,7 @@ func main() {
 					"org":   org,
 					"space": details.Space,
 					"date":  details.Timestamp.Add(24 * time.Duration(opts.PurgeDays) * time.Hour),
+					"days":  opts.PurgeDays,
 				}
 				body, err := sandbox.RenderTemplate(notifyTemplate, data)
 				log.Printf("sending to %s: %s", recipients, body)
@@ -116,6 +117,7 @@ func main() {
 				data := map[string]interface{}{
 					"org":   org,
 					"space": details.Space,
+					"days":  opts.PurgeDays,
 				}
 				body, err := sandbox.RenderTemplate(purgeTemplate, data)
 				log.Printf("sending to %s: %s", recipients, body)
