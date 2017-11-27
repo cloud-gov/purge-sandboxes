@@ -182,6 +182,7 @@ func GetFirstResource(
 	return firstResource, nil
 }
 
+// SpaceDetails describes a space and its first resource creation time
 type SpaceDetails struct {
 	Timestamp time.Time
 	Space     cfclient.Space
