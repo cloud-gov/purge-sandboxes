@@ -35,12 +35,12 @@ func main() {
 		log.Fatalf("error parsing options: %s", err.Error())
 	}
 
-	notifyTemplate, err := template.ParseFiles("./notify.tmpl")
+	notifyTemplate, err := template.ParseFiles("./templates/base.html", "./templates/notify.tmpl")
 	if err != nil {
 		log.Fatalf("error reading notify template: %s", err.Error())
 	}
 
-	purgeTemplate, err := template.ParseFiles("./purge.tmpl")
+	purgeTemplate, err := template.ParseFiles("./templates/base.html", "./templates/purge.tmpl")
 	if err != nil {
 		log.Fatalf("error reading purge template: %s", err.Error())
 	}
@@ -83,16 +83,18 @@ func main() {
 		}
 
 		log.Printf("notifying %d spaces in org %s", len(toNotify), org.Name)
-		for _, space := range toNotify {
-			recipients, _, _, err := sandbox.ListRecipients(space)
+		for _, details := range toNotify {
+			recipients, _, _, err := sandbox.ListRecipients(details.Space)
 			if err != nil {
-				log.Fatalf("error listing recipients on space %s: %s", space.Name, err.Error())
+				log.Fatalf("error listing recipients on space %s: %s", details.Space.Name, err.Error())
 			}
-			log.Printf("Notifying space %s; recipients %+v", space.Name, recipients)
+			log.Printf("Notifying space %s; recipients %+v", details.Space.Name, recipients)
 			if !opts.DryRun {
 				data := map[string]interface{}{
-					"space": space,
-					"days":  opts.PurgeDays - opts.NotifyDays,
+					"org":   org,
+					"space": details.Space,
+					"date":  details.Timestamp.Add(24 * time.Duration(opts.PurgeDays) * time.Hour),
+					"days":  opts.PurgeDays,
 				}
 				body, err := sandbox.RenderTemplate(notifyTemplate, data)
 				log.Printf("sending to %s: %s", recipients, body)
@@ -100,43 +102,47 @@ func main() {
 					log.Fatalf("error rendering email: %s", err.Error())
 				}
 				if err := sandbox.SendMail(opts.SMTPOptions, opts.MailSender, opts.NotifyMailSubject, body, recipients); err != nil {
-					log.Fatalf("error sending mail on space %s: %s", space.Name, err.Error())
+					log.Fatalf("error sending mail on space %s: %s", details.Space.Name, err.Error())
 				}
 			}
 		}
 
 		log.Printf("purging %d spaces in org %s", len(toPurge), org.Name)
-		for _, space := range toPurge {
-			recipients, developers, managers, err := sandbox.ListRecipients(space)
+		for _, details := range toPurge {
+			recipients, developers, managers, err := sandbox.ListRecipients(details.Space)
 			if err != nil {
-				log.Fatalf("error listing recipients on space %s: %s", space.Name, err.Error())
+				log.Fatalf("error listing recipients on space %s: %s", details.Space.Name, err.Error())
 			}
-			log.Printf("Purging space %s; recipients %+v", space.Name, recipients)
+			log.Printf("Purging space %s; recipients %+v", details.Space.Name, recipients)
 			if !opts.DryRun {
-				data := map[string]interface{}{"space": space}
+				data := map[string]interface{}{
+					"org":   org,
+					"space": details.Space,
+					"days":  opts.PurgeDays,
+				}
 				body, err := sandbox.RenderTemplate(purgeTemplate, data)
 				log.Printf("sending to %s: %s", recipients, body)
 				if err != nil {
 					log.Fatalf("error rendering email: %s", err.Error())
 				}
 				if err := sandbox.SendMail(opts.SMTPOptions, opts.MailSender, opts.PurgeMailSubject, body, recipients); err != nil {
-					log.Fatalf("error sending mail on space %s: %s", space.Name, err.Error())
+					log.Fatalf("error sending mail on space %s: %s", details.Space.Name, err.Error())
 				}
-				log.Printf("deleting and recreating space %s", space.Name)
-				if err := sandbox.PurgeSpace(client, space); err != nil {
-					purgeErrors = append(purgeErrors, fmt.Sprintf("error purging space %s in org %s: %s", space.Name, org.Name, err.Error()))
+				log.Printf("deleting and recreating space %s", details.Space.Name)
+				if err := sandbox.PurgeSpace(client, details.Space); err != nil {
+					purgeErrors = append(purgeErrors, fmt.Sprintf("error purging space %s in org %s: %s", details.Space.Name, org.Name, err.Error()))
 				} else {
 					if len(developers) > 0 || len(managers) > 0 {
 						spaceRequest := cfclient.SpaceRequest{
-							Name:              space.Name,
-							OrganizationGuid:  space.OrganizationGuid,
-							SpaceQuotaDefGuid: space.QuotaDefinitionGuid,
+							Name:              details.Space.Name,
+							OrganizationGuid:  details.Space.OrganizationGuid,
+							SpaceQuotaDefGuid: details.Space.QuotaDefinitionGuid,
 							DeveloperGuid:     developers,
 							ManagerGuid:       managers,
 						}
 						log.Printf("recreating space: %+v", spaceRequest)
 						if _, err := client.CreateSpace(spaceRequest); err != nil {
-							log.Fatalf("error recreating space %s: %s", space.Name, err.Error())
+							log.Fatalf("error recreating space %s: %s", details.Space.Name, err.Error())
 						}
 					}
 				}

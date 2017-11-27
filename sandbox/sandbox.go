@@ -182,6 +182,12 @@ func GetFirstResource(
 	return firstResource, nil
 }
 
+// SpaceDetails describes a space and its first resource creation time
+type SpaceDetails struct {
+	Timestamp time.Time
+	Space     cfclient.Space
+}
+
 // ListPurgeSpaces identifies spaces that will be notified or purged
 func ListPurgeSpaces(
 	spaces []cfclient.Space,
@@ -192,8 +198,8 @@ func ListPurgeSpaces(
 	purgeThreshold int,
 	timeStartsAt time.Time,
 ) (
-	toNotify []cfclient.Space,
-	toPurge []cfclient.Space,
+	toNotify []SpaceDetails,
+	toPurge []SpaceDetails,
 	err error,
 ) {
 	var firstResource time.Time
@@ -209,11 +215,12 @@ func ListPurgeSpaces(
 			firstResource = timeStartsAt
 		}
 
-		delta := int(now.Sub(firstResource.Truncate(24*time.Hour)).Hours() / 24)
-		if delta == notifyThreshold {
-			toNotify = append(toNotify, space)
-		} else if delta >= purgeThreshold {
-			toPurge = append(toPurge, space)
+		firstResource := firstResource.Truncate(24 * time.Hour)
+		delta := int(now.Sub(firstResource).Hours() / 24)
+		if delta >= purgeThreshold {
+			toPurge = append(toPurge, SpaceDetails{firstResource, space})
+		} else if delta >= notifyThreshold {
+			toNotify = append(toNotify, SpaceDetails{firstResource, space})
 		}
 	}
 	return

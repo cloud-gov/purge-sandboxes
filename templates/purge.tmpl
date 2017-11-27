@@ -1,0 +1,15 @@
+{{define "content"}}
+<p>You're receiving this message because you have content in a cloud.gov sandbox that is {{.days}} days old.</p>
+
+<p>Sandboxes are usable for {{.days}} days to help you evaluate whether cloud.gov is a good fit for your needs, but they're not suitable for long-lived
+or production applications.
+<a href="https://cloud.gov/overview/pricing/free-limited-sandbox/">Learn more about policies for sandbox usage</a>.</p>
+
+<p>We have deleted all applications, service instances, routes, etc., in the {{.org.Name}}/{{.space.Name}} space.
+This has reset the clock; you can start a new {{.days}}-day evaluation period just by creating a new app or service
+instance in the empty space.</p>
+
+<p>We hope you've found the sandbox helpful.
+If you'd like to host longer-lived content on cloud.gov, you'll need to do it as part of a <a href="https://cloud.gov/overview/pricing/rates/">prototyping or production package</a>.
+Please <a href="https://cloud.gov/docs/help/">contact us</a> to learn how to purchase one of these packages.</p>
+{{end}}

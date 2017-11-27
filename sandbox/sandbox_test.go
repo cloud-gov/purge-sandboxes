@@ -1,6 +1,9 @@
 package sandbox_test
 
 import (
+	"html/template"
+	"io/ioutil"
+	"os"
 	"time"
 
 	"github.com/cloudfoundry-community/go-cfclient"
@@ -48,7 +51,7 @@ var _ = Describe("Sandbox", func() {
 			Expect(toPurge).To(HaveLen(0))
 		})
 
-		It("skips spaces between thresholds", func() {
+		It("notifies on spaces between thresholds", func() {
 			apps = []cfclient.App{
 				{
 					Guid:      "app-guid",
@@ -58,7 +61,7 @@ var _ = Describe("Sandbox", func() {
 			}
 			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
 			Expect(err).NotTo(HaveOccurred())
-			Expect(toNotify).To(HaveLen(0))
+			Expect(toNotify).To(HaveLen(1))
 			Expect(toPurge).To(HaveLen(0))
 		})
 
@@ -192,6 +195,70 @@ var _ = Describe("Sandbox", func() {
 			firstResource, err := sandbox.GetFirstResource(space, apps, instances)
 			Expect(err).NotTo(HaveOccurred())
 			firstResource.Equal(now.Add(-10 * 24 * time.Hour))
+		})
+	})
+	Describe("RenderTemplate", func() {
+		var (
+			tpl              *template.Template
+			data             map[string]interface{}
+			err              error
+			expectedTestFile string
+		)
+		Context("NotifyTemplate", func() {
+			BeforeEach(func() {
+				tpl, err = template.ParseFiles("../templates/base.html", "../templates/notify.tmpl")
+				data = map[string]interface{}{
+					"org": cfclient.Org{
+						Name: "test-org",
+					},
+					"space": cfclient.Space{
+						Name: "test-space",
+					},
+					"date": time.Date(2009, 11, 17, 20, 34, 58, 651387237, time.UTC),
+					"days": 90,
+				}
+				expectedTestFile = "../testdata/notify.html"
+				Expect(err).NotTo(HaveOccurred())
+			})
+			It("constructs the appropriate notify template", func() {
+				renderedTemplate, err := sandbox.RenderTemplate(tpl, data)
+				Expect(err).NotTo(HaveOccurred())
+				if os.Getenv("OVERRIDE_TEMPLATES") == "1" {
+					err := ioutil.WriteFile(expectedTestFile, []byte(renderedTemplate), 0644)
+					Expect(err).NotTo(HaveOccurred())
+				}
+				expected, err := ioutil.ReadFile(expectedTestFile)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(renderedTemplate).To(Equal(string(expected)))
+			})
+		})
+		Context("PurgeTemplate", func() {
+			BeforeEach(func() {
+				tpl, err = template.ParseFiles("../templates/base.html", "../templates/purge.tmpl")
+				data = map[string]interface{}{
+					"org": cfclient.Org{
+						Name: "test-org",
+					},
+					"space": cfclient.Space{
+						Name: "test-space",
+					},
+					"date": time.Date(2009, 11, 17, 20, 34, 58, 651387237, time.UTC),
+					"days": 90,
+				}
+				expectedTestFile = "../testdata/purge.html"
+				Expect(err).NotTo(HaveOccurred())
+			})
+			It("constructs the appropriate notify template", func() {
+				renderedTemplate, err := sandbox.RenderTemplate(tpl, data)
+				Expect(err).NotTo(HaveOccurred())
+				if os.Getenv("OVERRIDE_TEMPLATES") == "1" {
+					err := ioutil.WriteFile(expectedTestFile, []byte(renderedTemplate), 0644)
+					Expect(err).NotTo(HaveOccurred())
+				}
+				expected, err := ioutil.ReadFile(expectedTestFile)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(renderedTemplate).To(Equal(string(expected)))
+			})
 		})
 	})
 })
