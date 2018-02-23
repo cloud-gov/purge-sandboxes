@@ -29,9 +29,6 @@ func ListRecipients(space cfclient.Space) (addresses, developers, managers []str
 		return
 	}
 	for _, role := range roles {
-		if !role.Active {
-			continue
-		}
 		if _, err := mail.ParseAddress(role.Username); err == nil {
 			addresses = append(addresses, role.Username)
 		}
