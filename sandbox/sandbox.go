@@ -98,7 +98,7 @@ func SendMail(
 		"Subject": {subject},
 		"To":      recipients,
 	})
-	m.SetBody("text/plain", body)
+	m.SetBody("text/html", body)
 	return gomail.Send(s, m)
 }
 
