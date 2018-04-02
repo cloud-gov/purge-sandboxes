@@ -21,14 +21,15 @@ type SMTPOptions struct {
 	SMTPPass string `envconfig:"smtp_pass" required:"true"`
 }
 
-// ListRecipients get a list of recipient emails from a space
-func ListRecipients(space cfclient.Space) (addresses, developers, managers []string, err error) {
-	var roles []cfclient.SpaceRole
-	roles, err = space.Roles()
-	if err != nil {
-		return
-	}
+// ListRecipients get a list of recipient emails from space roles
+func ListRecipients(userGUIDs map[string]bool, roles []cfclient.SpaceRole) (addresses, developers, managers []string) {
+	addresses = []string{}
+	developers = []string{}
+	managers = []string{}
 	for _, role := range roles {
+		if _, ok := userGUIDs[role.Guid]; !ok {
+			continue
+		}
 		if _, err := mail.ParseAddress(role.Username); err == nil {
 			addresses = append(addresses, role.Username)
 		}
@@ -36,7 +37,7 @@ func ListRecipients(space cfclient.Space) (addresses, developers, managers []str
 			if roleType == "space_developer" {
 				developers = append(developers, role.Guid)
 			} else if roleType == "space_manager" {
-				developers = append(managers, role.Guid)
+				managers = append(managers, role.Guid)
 			}
 		}
 	}
