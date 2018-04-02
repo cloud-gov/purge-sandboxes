@@ -15,6 +15,40 @@ import (
 )
 
 var _ = Describe("Sandbox", func() {
+	Describe("ListRecipients", func() {
+		var (
+			userGUIDs map[string]bool
+			roles     []cfclient.SpaceRole
+		)
+
+		It("skips users not in guids map", func() {
+			userGUIDs = map[string]bool{
+				"user-1": true,
+				"user-2": true,
+			}
+			roles = []cfclient.SpaceRole{
+				{Guid: "user-1", SpaceRoles: []string{"space_developer", "space_manager"}},
+				{Guid: "user-2", SpaceRoles: []string{"space_developer"}},
+				{Guid: "user-3", SpaceRoles: []string{"space_developer"}},
+			}
+			_, developers, managers := sandbox.ListRecipients(userGUIDs, roles)
+			Expect(developers).To(Equal([]string{"user-1", "user-2"}))
+			Expect(managers).To(Equal([]string{"user-1"}))
+		})
+
+		It("parses email addresses", func() {
+			userGUIDs = map[string]bool{
+				"user-1": true,
+			}
+			roles = []cfclient.SpaceRole{
+				{Guid: "user-1", SpaceRoles: []string{"space_developer"}, Username: "foo@bar.gov"},
+				{Guid: "user-2", SpaceRoles: []string{"space_manager"}},
+			}
+			addresses, _, _ := sandbox.ListRecipients(userGUIDs, roles)
+			Expect(addresses).To(Equal([]string{"foo@bar.gov"}))
+		})
+	})
+
 	Describe("ListPurgeSpaces", func() {
 		var (
 			spaces    []cfclient.Space

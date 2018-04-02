@@ -59,6 +59,15 @@ func main() {
 		log.Fatalf("error getting orgs: %s", err.Error())
 	}
 
+	users, err := client.ListUsers()
+	if err != nil {
+		log.Fatalf("error getting users: %s", err.Error())
+	}
+	userGUIDs := map[string]bool{}
+	for _, user := range users {
+		userGUIDs[user.Guid] = true
+	}
+
 	now := time.Now().Truncate(24 * time.Hour)
 
 	var timeStartsAt time.Time
@@ -84,7 +93,11 @@ func main() {
 
 		log.Printf("notifying %d spaces in org %s", len(toNotify), org.Name)
 		for _, details := range toNotify {
-			recipients, _, _, err := sandbox.ListRecipients(details.Space)
+			roles, err := details.Space.Roles()
+			if err != nil {
+				log.Fatalf("error listing roles on space %s: %s", details.Space.Name, err.Error())
+			}
+			recipients, _, _, err := sandbox.ListRecipients(userGUIDs, details.Space, roles)
 			if err != nil {
 				log.Fatalf("error listing recipients on space %s: %s", details.Space.Name, err.Error())
 			}
@@ -109,7 +122,11 @@ func main() {
 
 		log.Printf("purging %d spaces in org %s", len(toPurge), org.Name)
 		for _, details := range toPurge {
-			recipients, developers, managers, err := sandbox.ListRecipients(details.Space)
+			roles, err := details.Space.Roles()
+			if err != nil {
+				log.Fatalf("error listing roles on space %s: %s", details.Space.Name, err.Error())
+			}
+			recipients, developers, managers, err := sandbox.ListRecipients(userGUIDs, details.Space, roles)
 			if err != nil {
 				log.Fatalf("error listing recipients on space %s: %s", details.Space.Name, err.Error())
 			}
