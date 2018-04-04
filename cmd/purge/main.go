@@ -97,7 +97,7 @@ func main() {
 			if err != nil {
 				log.Fatalf("error listing roles on space %s: %s", details.Space.Name, err.Error())
 			}
-			recipients, _, _, err := sandbox.ListRecipients(userGUIDs, details.Space, roles)
+			recipients, _, _ := sandbox.ListRecipients(userGUIDs, roles)
 			if err != nil {
 				log.Fatalf("error listing recipients on space %s: %s", details.Space.Name, err.Error())
 			}
@@ -126,7 +126,7 @@ func main() {
 			if err != nil {
 				log.Fatalf("error listing roles on space %s: %s", details.Space.Name, err.Error())
 			}
-			recipients, developers, managers, err := sandbox.ListRecipients(userGUIDs, details.Space, roles)
+			recipients, developers, managers := sandbox.ListRecipients(userGUIDs, roles)
 			if err != nil {
 				log.Fatalf("error listing recipients on space %s: %s", details.Space.Name, err.Error())
 			}
