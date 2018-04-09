@@ -59,13 +59,16 @@ func main() {
 		log.Fatalf("error getting orgs: %s", err.Error())
 	}
 
+	// Build filter of users with email addresses (not service accounts)
 	users, err := client.ListUsers()
 	if err != nil {
 		log.Fatalf("error getting users: %s", err.Error())
 	}
 	userGUIDs := map[string]bool{}
 	for _, user := range users {
-		userGUIDs[user.Guid] = true
+		if strings.Contains(user.Username, "@") {
+			userGUIDs[user.Guid] = true
+		}
 	}
 
 	now := time.Now().Truncate(24 * time.Hour)
@@ -127,9 +130,6 @@ func main() {
 				log.Fatalf("error listing roles on space %s: %s", details.Space.Name, err.Error())
 			}
 			recipients, developers, managers := sandbox.ListRecipients(userGUIDs, roles)
-			if err != nil {
-				log.Fatalf("error listing recipients on space %s: %s", details.Space.Name, err.Error())
-			}
 			log.Printf("Purging space %s; recipients %+v", details.Space.Name, recipients)
 			if !opts.DryRun {
 				data := map[string]interface{}{
@@ -148,19 +148,20 @@ func main() {
 				log.Printf("deleting and recreating space %s", details.Space.Name)
 				if err := sandbox.PurgeSpace(client, details.Space); err != nil {
 					purgeErrors = append(purgeErrors, fmt.Sprintf("error purging space %s in org %s: %s", details.Space.Name, org.Name, err.Error()))
-				} else {
-					if len(developers) > 0 || len(managers) > 0 {
-						spaceRequest := cfclient.SpaceRequest{
-							Name:              details.Space.Name,
-							OrganizationGuid:  details.Space.OrganizationGuid,
-							SpaceQuotaDefGuid: details.Space.QuotaDefinitionGuid,
-							DeveloperGuid:     developers,
-							ManagerGuid:       managers,
-						}
-						log.Printf("recreating space: %+v", spaceRequest)
-						if _, err := client.CreateSpace(spaceRequest); err != nil {
-							log.Fatalf("error recreating space %s: %s", details.Space.Name, err.Error())
-						}
+					break
+				}
+				if len(developers) > 0 || len(managers) > 0 {
+					spaceRequest := cfclient.SpaceRequest{
+						Name:              details.Space.Name,
+						OrganizationGuid:  details.Space.OrganizationGuid,
+						SpaceQuotaDefGuid: details.Space.QuotaDefinitionGuid,
+						DeveloperGuid:     developers,
+						ManagerGuid:       managers,
+					}
+					log.Printf("recreating space: %+v", spaceRequest)
+					if _, err := client.CreateSpace(spaceRequest); err != nil {
+						purgeErrors = append(purgeErrors, fmt.Sprintf("error recreating space %s in org %s: %s", details.Space.Name, org.Name, err.Error()))
+						break
 					}
 				}
 			}
