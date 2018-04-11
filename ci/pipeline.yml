@@ -29,6 +29,7 @@ jobs:
       SMTP_USER: {{smtp-user}}
       SMTP_PASS: {{smtp-pass}}
       SMTP_PORT: {{smtp-port}}
+      SMTP_CERT: {{smtp-cert}}
       MAIL_SENDER: {{sender}}
       TIME_STARTS_AT: {{time-starts-at-staging}}
       DRY_RUN: {{dry-run-staging}}
@@ -71,6 +72,7 @@ jobs:
       SMTP_USER: {{smtp-user}}
       SMTP_PASS: {{smtp-pass}}
       SMTP_PORT: {{smtp-port}}
+      SMTP_CERT: {{smtp-cert}}
       MAIL_SENDER: {{sender}}
       TIME_STARTS_AT: {{time-starts-at-production}}
       DRY_RUN: {{dry-run-production}}
