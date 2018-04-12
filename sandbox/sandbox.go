@@ -2,6 +2,8 @@ package sandbox
 
 import (
 	"bytes"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"html/template"
 	"net/mail"
@@ -19,6 +21,7 @@ type SMTPOptions struct {
 	SMTPPort int    `envconfig:"smtp_port" default:"587"`
 	SMTPUser string `envconfig:"smtp_user" required:"true"`
 	SMTPPass string `envconfig:"smtp_pass" required:"true"`
+	SMTPCert string `envconfig:"smtp_cert"`
 }
 
 // ListRecipients get a list of recipient emails from space roles
@@ -85,6 +88,14 @@ func SendMail(
 	}
 
 	d := gomail.NewDialer(opts.SMTPHost, opts.SMTPPort, opts.SMTPUser, opts.SMTPPass)
+	if opts.SMTPCert != "" {
+		pool := x509.NewCertPool()
+		pool.AppendCertsFromPEM([]byte(opts.SMTPCert))
+		d.TLSConfig = &tls.Config{
+			ServerName: opts.SMTPHost,
+			RootCAs:    pool,
+		}
+	}
 	s, err := d.Dial()
 	if err != nil {
 		return err
