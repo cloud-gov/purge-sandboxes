@@ -1,8 +1,9 @@
 {{define "content"}}
-<p>You're receiving this message because you have content in a cloud.gov sandbox that is {{.days}} days old.</p>
+<p>You're receiving this message to confirm that we have cleared your Sandbox.</p>
 
-<p>Sandboxes are usable for {{.days}} days to help you evaluate whether cloud.gov is a good fit for your needs, but they're not suitable for long-lived
-or production applications.
+<p>
+  We clear all sandbox contents {{.days}} days after the first application or service is created to ensure that sandboxes aren't being used for production applications.
+You may re-deploy your application(s) after your Sandbox is cleared and continue to evaluate whether cloud.gov is a good fit for your needs.
 <a href="https://cloud.gov/overview/pricing/free-limited-sandbox/">Learn more about policies for sandbox usage</a>.</p>
 
 <p>We have deleted all applications, service instances, routes, etc., in the {{.org.Name}}/{{.space.Name}} space.
