@@ -53,8 +53,35 @@ func PurgeSpace(client *cfclient.Client, space cfclient.Space) error {
 	if spaceErr != nil {
 		query := url.Values(map[string][]string{"q": []string{fmt.Sprintf("space_guid:%s", space.Guid)}})
 		apps, err := client.ListAppsByQuery(query)
+		services, err1 := client.ListServiceInstancesByQuery(query)
 		if err != nil {
 			return err
+		}
+		if err1 != nil {
+			return err1
+		}
+		for _, service := range services {
+			// Check if bound to app or if service has a service key, if so delete 
+			binding_query := url.Values(map[string][]string{"q": []string{fmt.Sprintf("service_instance_guid:%s", service.Guid)}})
+			service_bindings, binding_error := client.ListServiceBindingsByQuery(binding_query)
+			service_keys, seervice_err := client.ListServiceKeysByQuery(binding_query)
+			
+			for _, service_binding := service_bindings {
+				if err := client.DeleteServiceBinding(service_binding.Guid); err != nil {
+					return err
+				}
+			}
+			for _, service_key := service_keys {
+				if err := client.DeleteServiceKey(service_key.Guid); err != nil {
+					return err
+				}
+			}
+			// finally, delete service
+			if err := client.DeleteService(service.Guid); err != nil {
+				return err
+			}
+
+
 		}
 		for _, app := range apps {
 			if err := client.DeleteApp(app.Guid); err != nil {
