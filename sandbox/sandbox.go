@@ -56,24 +56,7 @@ func PurgeSpace(client *cfclient.Client, space cfclient.Space) error {
 		if err != nil {
 			return err
 		}
-		services, err := client.ListServiceInstancesByQuery(query)
-		if err != nil {
-			return err
-		}
-		for _, service := range services {
-			bindingQuery := url.Values(map[string][]string{"q": []string{fmt.Sprintf("service_instance_guid:%s", service.Guid)}})
-			serviceKeys, serviceErr := client.ListServiceKeysByQuery(bindingQuery)
-
-			for _, serviceKey := range serviceKeys {
-				if err := client.DeleteServiceKey(serviceKey.Guid); err != nil {
-					return err
-				}
-			}
-			if err := client.DeleteService(service.Guid); err != nil {
-				return err
-			}
-
-		}
+		PurgeServices(client, space)
 		for _, app := range apps {
 			if err := client.DeleteApp(app.Guid); err != nil {
 				return err
@@ -82,6 +65,28 @@ func PurgeSpace(client *cfclient.Client, space cfclient.Space) error {
 		return spaceErr
 	}
 	return nil
+}
+
+// Purge service keys and services
+func PurgeServices(client *cfclient.Client, space cfclient.Space) error {
+	services, err := client.ListServiceInstancesByQuery(query)
+	if err != nil {
+		return err
+	}
+	for _, service := range services {
+		bindingQuery := url.Values(map[string][]string{"q": []string{fmt.Sprintf("service_instance_guid:%s", service.Guid)}})
+		serviceKeys, serviceErr := client.ListServiceKeysByQuery(bindingQuery)
+
+		for _, serviceKey := range serviceKeys {
+			if err := client.DeleteServiceKey(serviceKey.Guid); err != nil {
+				return err
+			}
+		}
+		if err := client.DeleteService(service.Guid); err != nil {
+			return err
+		}
+
+	}
 }
 
 // RenderTemplate renders a template to string
