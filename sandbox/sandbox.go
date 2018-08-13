@@ -67,7 +67,7 @@ func PurgeSpace(client *cfclient.Client, space cfclient.Space) error {
 	return nil
 }
 
-// Purge service keys and services
+// PurgeServices deletes keys and services for the defined space, is now called if space deletion fails
 func PurgeServices(client *cfclient.Client, space cfclient.Space) error {
 	services, err := client.ListServiceInstancesByQuery(query)
 	if err != nil {
