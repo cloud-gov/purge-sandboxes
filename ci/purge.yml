@@ -13,3 +13,21 @@ inputs:
 
 run:
   path: gopath/src/github.com/18F/cg-sandbox/ci/purge.sh
+
+params:
+  API_ADDRESS:
+  CLIENT_ID:
+  CLIENT_SECRET:
+  ORG_PREFIX:
+  NOTIFY_DAYS:
+  PURGE_DAYS:
+  NOTIFY_MAIL_SUBJECT:
+  PURGE_MAIL_SUBJECT:
+  SMTP_HOST:
+  SMTP_USER:
+  SMTP_PASS:
+  SMTP_PORT:
+  SMTP_CERT:
+  MAIL_SENDER:
+  TIME_STARTS_AT:
+  DRY_RUN:
