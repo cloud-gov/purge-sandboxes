@@ -9,7 +9,7 @@ jobs:
 
 - name: purge-sandboxes-staging
   plan:
-  - aggregate:
+  - in_parallel:
     - get: sandbox-source
       passed: [test]
     - get: schedule
@@ -52,7 +52,7 @@ jobs:
 
 - name: purge-sandboxes-production
   plan:
-  - aggregate:
+  - in_parallel:
     - get: sandbox-source
       passed: [purge-sandboxes-staging]
     - get: schedule
