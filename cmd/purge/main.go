@@ -10,7 +10,7 @@ import (
 	"github.com/cloudfoundry-community/go-cfclient"
 	"github.com/kelseyhightower/envconfig"
 
-	"github.com/18F/cg-sandbox/sandbox"
+	"github.com/18f/cg-sandbox/sandbox"
 )
 
 // Options describes common configuration
