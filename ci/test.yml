@@ -5,11 +5,11 @@ image_resource:
   type: docker-image
   source:
     repository: golang
-    tag: "1.8"
+    tag: latest
 
 inputs:
 - name: sandbox-source
-  path: gopath/src/github.com/18F/cg-sandbox
+  path: cg-sandbox
 
 run:
-  path: gopath/src/github.com/18F/cg-sandbox/ci/test.sh
+  path: cg-sandbox/ci/test.sh
