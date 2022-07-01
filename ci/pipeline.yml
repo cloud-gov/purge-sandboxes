@@ -39,13 +39,14 @@ jobs:
       text: |
         :x: FAILED to notify sandbox users on staging
         <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
-      channel: ((slack-channel))
+      channel: '#cg-platform-news'
       username: ((slack-username))
       icon_url: ((slack-icon-url))
   on_success:
     put: slack
     params:
       <<: *slack-params
+      channel: '#cg-platform-news'
       text: |
         :white_check_mark: Successfully notified sandbox users on staging
         <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
@@ -80,6 +81,7 @@ jobs:
     put: slack
     params:
       <<: *slack-params
+      channel: '#cg-platform'
       text: |
         :x: FAILED to notify sandbox users on production
         <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
@@ -87,6 +89,7 @@ jobs:
     put: slack
     params:
       <<: *slack-params
+      channel: '#cg-platform-news'
       text: |
         :white_check_mark: Successfully notified sandbox users on production
         <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
@@ -95,6 +98,7 @@ resources:
 - name: sandbox-source
   type: git
   source:
+    commit_verification_keys: ((cloud-gov-pgp-keys))
     uri: ((sandbox-source-uri))
     branch: ((sandbox-source-branch))
 
