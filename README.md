@@ -1,4 +1,4 @@
-# cg-sandbox
+# cg-sandbox 
 
 [![Code Climate](https://codeclimate.com/github/18F/cg-sandbox/badges/gpa.svg)](https://codeclimate.com/github/18F/cg-sandbox)
 
