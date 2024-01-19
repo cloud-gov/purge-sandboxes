@@ -25,8 +25,7 @@ type SMTPOptions struct {
 }
 
 // ListRecipients get a list of recipient emails from space users
-func ListSpaceUsers(
-	cfClient *client.Client,
+func ListRecipients(
 	userGUIDs map[string]bool,
 	spaceUsers []*resource.User,
 ) (addresses []string, err error) {
@@ -45,7 +44,6 @@ func ListSpaceUsers(
 }
 
 func ListSpaceDevsAndManagers(
-	cfClient *client.Client,
 	userGUIDs map[string]bool,
 	spaceRoles []*resource.Role,
 ) (developers []string, managers []string) {

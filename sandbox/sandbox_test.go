@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/cloudfoundry-community/go-cfclient"
+	"github.com/cloudfoundry-community/go-cfclient/v3/resource"
 
 	"github.com/18f/cg-sandbox/sandbox"
 
@@ -18,7 +19,7 @@ var _ = Describe("Sandbox", func() {
 	Describe("ListRecipients", func() {
 		var (
 			userGUIDs map[string]bool
-			roles     []cfclient.SpaceRole
+			users     []*resource.User
 		)
 
 		It("skips users not in guids map", func() {
@@ -26,40 +27,88 @@ var _ = Describe("Sandbox", func() {
 				"user-1": true,
 				"user-2": true,
 			}
-			roles = []cfclient.SpaceRole{
-				{Guid: "user-1", SpaceRoles: []string{"space_developer", "space_manager"}},
-				{Guid: "user-2", SpaceRoles: []string{"space_developer"}},
-				{Guid: "user-3", SpaceRoles: []string{"space_developer"}},
+			users = []*resource.User{
+				{GUID: "user-1"},
+				{GUID: "user-2"},
+				{GUID: "user-3"},
 			}
-			_, developers, managers := sandbox.ListRecipients(userGUIDs, roles)
-			Expect(developers).To(Equal([]string{"user-1", "user-2"}))
-			Expect(managers).To(Equal([]string{"user-1"}))
+			recipients, _ := sandbox.ListRecipients(userGUIDs, users)
+			Expect(recipients).To(Equal([]string{"user-1", "user-2"}))
 		})
 
 		It("parses email addresses", func() {
 			userGUIDs = map[string]bool{
 				"user-1": true,
 			}
-			roles = []cfclient.SpaceRole{
-				{Guid: "user-1", SpaceRoles: []string{"space_developer"}, Username: "foo@bar.gov"},
-				{Guid: "user-2", SpaceRoles: []string{"space_manager"}},
+			users = []*resource.User{
+				{GUID: "user-1", Username: "foo@bar.gov"},
+				{GUID: "user-2"},
 			}
-			addresses, _, _ := sandbox.ListRecipients(userGUIDs, roles)
-			Expect(addresses).To(Equal([]string{"foo@bar.gov"}))
+			recipients, _ := sandbox.ListRecipients(userGUIDs, users)
+			Expect(recipients).To(Equal([]string{"foo@bar.gov"}))
+		})
+	})
+
+	Describe("ListSpaceDevsAndManagers", func() {
+		var (
+			userGUIDs map[string]bool
+			roles     []*resource.Role
+		)
+
+		It("skips users not in guids map", func() {
+			userGUIDs = map[string]bool{
+				"user-1": true,
+				"user-2": true,
+			}
+			roles = []*resource.Role{
+				{
+					Type: "space_developer",
+					Relationships: resource.RoleSpaceUserOrganizationRelationships{
+						User: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "user-1",
+							},
+						},
+					},
+				},
+				{
+					Type: "space_manager",
+					Relationships: resource.RoleSpaceUserOrganizationRelationships{
+						User: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "user-1",
+							},
+						},
+					},
+				},
+				{
+					Type: "space_developer",
+					Relationships: resource.RoleSpaceUserOrganizationRelationships{
+						User: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "user-2",
+							},
+						},
+					},
+				},
+			}
+			developers, managers := sandbox.ListSpaceDevsAndManagers(userGUIDs, roles)
+			Expect(developers).To(Equal([]string{"user-1", "user-2"}))
+			Expect(managers).To(Equal([]string{"user-1"}))
 		})
 	})
 
 	Describe("ListPurgeSpaces", func() {
 		var (
-			spaces    []cfclient.Space
-			apps      []cfclient.App
-			instances []cfclient.ServiceInstance
+			spaces    []*resource.Space
+			apps      []*resource.App
+			instances []*resource.ServiceInstance
 			now       time.Time
 		)
 
 		BeforeEach(func() {
-			spaces = []cfclient.Space{
-				{Guid: "space-guid"},
+			spaces = []*resource.Space{
+				{GUID: "space-guid"},
 			}
 			now = time.Now().Truncate(24 * time.Hour)
 		})
@@ -72,11 +121,17 @@ var _ = Describe("Sandbox", func() {
 		})
 
 		It("skips spaces with recent resources", func() {
-			apps = []cfclient.App{
+			apps = []*resource.App{
 				{
-					Guid:      "app-guid",
-					SpaceGuid: "space-guid",
-					CreatedAt: now.Add(-15 * 24 * time.Hour).Format(time.RFC3339Nano),
+					GUID: "app-guid",
+					Relationships: resource.SpaceRelationship{
+						Space: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-15 * 24 * time.Hour),
 				},
 			}
 			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
@@ -86,11 +141,17 @@ var _ = Describe("Sandbox", func() {
 		})
 
 		It("notifies on spaces between thresholds", func() {
-			apps = []cfclient.App{
+			apps = []*resource.App{
 				{
-					Guid:      "app-guid",
-					SpaceGuid: "space-guid",
-					CreatedAt: now.Add(-28 * 24 * time.Hour).Format(time.RFC3339Nano),
+					GUID: "app-guid",
+					Relationships: resource.SpaceRelationship{
+						Space: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-28 * 24 * time.Hour),
 				},
 			}
 			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
@@ -100,11 +161,17 @@ var _ = Describe("Sandbox", func() {
 		})
 
 		It("notifies on the notify threshold", func() {
-			apps = []cfclient.App{
+			apps = []*resource.App{
 				{
-					Guid:      "app-guid",
-					SpaceGuid: "space-guid",
-					CreatedAt: now.Add(-25 * 24 * time.Hour).Format(time.RFC3339Nano),
+					GUID: "app-guid",
+					Relationships: resource.SpaceRelationship{
+						Space: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-25 * 24 * time.Hour),
 				},
 			}
 			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
@@ -114,11 +181,17 @@ var _ = Describe("Sandbox", func() {
 		})
 
 		It("purges on the purge threshold", func() {
-			apps = []cfclient.App{
+			apps = []*resource.App{
 				{
-					Guid:      "app-guid",
-					SpaceGuid: "space-guid",
-					CreatedAt: now.Add(-30 * 24 * time.Hour).Format(time.RFC3339Nano),
+					GUID: "app-guid",
+					Relationships: resource.SpaceRelationship{
+						Space: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-30 * 24 * time.Hour),
 				},
 			}
 			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
@@ -128,11 +201,17 @@ var _ = Describe("Sandbox", func() {
 		})
 
 		It("purges after the purge threshold", func() {
-			apps = []cfclient.App{
+			apps = []*resource.App{
 				{
-					Guid:      "app-guid",
-					SpaceGuid: "space-guid",
-					CreatedAt: now.Add(-31 * 24 * time.Hour).Format(time.RFC3339Nano),
+					GUID: "app-guid",
+					Relationships: resource.SpaceRelationship{
+						Space: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-31 * 24 * time.Hour),
 				},
 			}
 			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
@@ -142,11 +221,17 @@ var _ = Describe("Sandbox", func() {
 		})
 
 		It("purges after the purge threshold when time starts in the past", func() {
-			apps = []cfclient.App{
+			apps = []*resource.App{
 				{
-					Guid:      "app-guid",
-					SpaceGuid: "space-guid",
-					CreatedAt: now.Add(-31 * 24 * time.Hour).Format(time.RFC3339Nano),
+					GUID: "app-guid",
+					Relationships: resource.SpaceRelationship{
+						Space: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-31 * 24 * time.Hour),
 				},
 			}
 			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, now.Add(-60*24*time.Hour))
@@ -156,11 +241,17 @@ var _ = Describe("Sandbox", func() {
 		})
 
 		It("skips purge when time starts after last timestamp", func() {
-			apps = []cfclient.App{
+			apps = []*resource.App{
 				{
-					Guid:      "app-guid",
-					SpaceGuid: "space-guid",
-					CreatedAt: now.Add(-31 * 24 * time.Hour).Format(time.RFC3339Nano),
+					GUID: "app-guid",
+					Relationships: resource.SpaceRelationship{
+						Space: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-31 * 24 * time.Hour),
 				},
 			}
 			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, now)

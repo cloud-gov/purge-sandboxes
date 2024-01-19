@@ -114,7 +114,7 @@ func main() {
 				log.Fatalf("error listing roles on space %s: %s", details.Space.Name, err.Error())
 			}
 
-			recipients, err = sandbox.ListSpaceUsers(cfClient, userGUIDs, spaceUsers)
+			recipients, err = sandbox.ListRecipients(userGUIDs, spaceUsers)
 			if err != nil {
 				log.Fatalf("error listing recipients on space %s: %s", details.Space.Name, err.Error())
 			}
@@ -150,7 +150,7 @@ func main() {
 				log.Fatalf("error listing roles on space %s: %s", details.Space.Name, err.Error())
 			}
 
-			developers, managers := sandbox.ListSpaceDevsAndManagers(cfClient, userGUIDs, spaceRoles)
+			developers, managers := sandbox.ListSpaceDevsAndManagers(userGUIDs, spaceRoles)
 			log.Printf("Purging space %s; recipients %+v", details.Space.Name, recipients)
 			if !opts.DryRun {
 				data := map[string]interface{}{
