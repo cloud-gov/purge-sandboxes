@@ -36,7 +36,7 @@ jobs:
       SMTP_PASS: ((smtp-pass))
       SMTP_PORT: ((smtp-port))
       SMTP_CERT: ((smtp-cert))
-      MAIL_SENDER: ((sender))
+      MAIL_SENDER: ((smtp-from))
       TIME_STARTS_AT: ((time-starts-at-staging))
       DRY_RUN: ((dry-run-staging))
   on_failure:
@@ -82,7 +82,7 @@ jobs:
       SMTP_PASS: ((smtp-pass))
       SMTP_PORT: ((smtp-port))
       SMTP_CERT: ((smtp-cert))
-      MAIL_SENDER: ((sender))
+      MAIL_SENDER: ((smtp-from))
       TIME_STARTS_AT: ((time-starts-at-production))
       DRY_RUN: ((dry-run-production))
   on_failure:
