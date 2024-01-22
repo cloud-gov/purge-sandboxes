@@ -21,6 +21,7 @@ func TestListRecipients(t *testing.T) {
 		userGUIDs          map[string]bool
 		users              []*resource.User
 		expectedRecipients []string
+		expectedErr        string
 	}{
 		"skips users not in GUIDs map": {
 			userGUIDs: map[string]bool{
@@ -34,12 +35,21 @@ func TestListRecipients(t *testing.T) {
 			},
 			expectedRecipients: []string{"foo1@bar.gov", "foo2@bar.gov"},
 		},
+		"returns error for missing username": {
+			userGUIDs: map[string]bool{
+				"user-1": true,
+			},
+			users: []*resource.User{
+				{GUID: "user-1"},
+			},
+			expectedErr: "mail: no address",
+		},
 	}
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
 			recipients, err := sandbox.ListRecipients(test.userGUIDs, test.users)
-			if err != nil {
-				t.Fatalf("unexpected error: %s", err)
+			if (test.expectedErr == "" && err != nil) || (test.expectedErr != "" && test.expectedErr != err.Error()) {
+				t.Fatalf("expected error: %s, got: %s", test.expectedErr, err)
 			}
 			if diff := cmp.Diff(test.expectedRecipients, recipients); diff != "" {
 				t.Errorf("ListRecipients() mismatch (-want +got):\n%s", diff)
@@ -48,39 +58,98 @@ func TestListRecipients(t *testing.T) {
 	}
 }
 
-var _ = Describe("Sandbox", func() {
-	Describe("ListRecipients", func() {
-		var (
-			userGUIDs map[string]bool
-			users     []*resource.User
-		)
-
-		It("skips users not in guids map", func() {
-			userGUIDs = map[string]bool{
+func TestListSpaceDevsAndManagers(t *testing.T) {
+	testCases := map[string]struct {
+		userGUIDs        map[string]bool
+		roles            []*resource.Role
+		expectedDevs     []string
+		expectedManagers []string
+		expectedErr      string
+	}{
+		"returns correct devs and managers": {
+			userGUIDs: map[string]bool{
 				"user-1": true,
 				"user-2": true,
-			}
-			users = []*resource.User{
-				{GUID: "user-1"},
-				{GUID: "user-2"},
-				{GUID: "user-3"},
-			}
-			recipients, _ := sandbox.ListRecipients(userGUIDs, users)
-			Expect(recipients).To(Equal([]string{"user-1", "user-2"}))
-		})
-
-		It("parses email addresses", func() {
-			userGUIDs = map[string]bool{
+			},
+			roles: []*resource.Role{
+				{
+					Type: "space_developer",
+					Relationships: resource.RoleSpaceUserOrganizationRelationships{
+						User: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "user-1",
+							},
+						},
+					},
+				},
+				{
+					Type: "space_manager",
+					Relationships: resource.RoleSpaceUserOrganizationRelationships{
+						User: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "user-1",
+							},
+						},
+					},
+				},
+				{
+					Type: "space_developer",
+					Relationships: resource.RoleSpaceUserOrganizationRelationships{
+						User: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "user-2",
+							},
+						},
+					},
+				},
+			},
+			expectedDevs:     []string{"user-1", "user-2"},
+			expectedManagers: []string{"user-1"},
+		},
+		"skips users not in user GUIDs map": {
+			userGUIDs: map[string]bool{
 				"user-1": true,
+			},
+			roles: []*resource.Role{
+				{
+					Type: "space_developer",
+					Relationships: resource.RoleSpaceUserOrganizationRelationships{
+						User: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "user-1",
+							},
+						},
+					},
+				},
+				{
+					Type: "space_developer",
+					Relationships: resource.RoleSpaceUserOrganizationRelationships{
+						User: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "user-2",
+							},
+						},
+					},
+				},
+			},
+			expectedDevs:     []string{"user-1"},
+			expectedManagers: []string{},
+		},
+	}
+	for name, test := range testCases {
+		t.Run(name, func(t *testing.T) {
+			devs, managers := sandbox.ListSpaceDevsAndManagers(test.userGUIDs, test.roles)
+			if diff := cmp.Diff(test.expectedDevs, devs); diff != "" {
+				t.Errorf("ListSpaceDevsAndManagers() mismatch (-want +got):\n%s", diff)
 			}
-			users = []*resource.User{
-				{GUID: "user-1", Username: "foo@bar.gov"},
-				{GUID: "user-2"},
+			if diff := cmp.Diff(test.expectedManagers, managers); diff != "" {
+				t.Errorf("ListSpaceDevsAndManagers() mismatch (-want +got):\n%s", diff)
 			}
-			recipients, _ := sandbox.ListRecipients(userGUIDs, users)
-			Expect(recipients).To(Equal([]string{"foo@bar.gov"}))
 		})
-	})
+	}
+}
+
+var _ = Describe("Sandbox", func() {
 
 	Describe("ListSpaceDevsAndManagers", func() {
 		var (
