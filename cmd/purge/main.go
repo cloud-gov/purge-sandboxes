@@ -11,30 +11,33 @@ import (
 	"github.com/cloudfoundry-community/go-cfclient/v3/client"
 	"github.com/cloudfoundry-community/go-cfclient/v3/config"
 	"github.com/cloudfoundry-community/go-cfclient/v3/resource"
-	"github.com/kelseyhightower/envconfig"
+
+	"github.com/sethvargo/go-envconfig"
 
 	"github.com/18f/cg-sandbox/sandbox"
 )
 
 // Options describes common configuration
 type Options struct {
-	APIAddress        string `envconfig:"api_address" required:"true"`
-	ClientID          string `envconfig:"client_id" required:"true"`
-	ClientSecret      string `envconfig:"client_secret" required:"true"`
-	OrgPrefix         string `envconfig:"org_prefix" required:"true"`
-	NotifyDays        int    `envconfig:"notify_days" default:"25"`
-	PurgeDays         int    `envconfig:"purge_days" default:"30"`
-	MailSender        string `envconfig:"mail_sender" required:"true"`
-	NotifyMailSubject string `envconfig:"notify_mail_subject" required:"true"`
-	PurgeMailSubject  string `envconfig:"purge_mail_subject" required:"true"`
-	DryRun            bool   `envconfig:"dry_run" default:"true"`
-	TimeStartsAt      string `envconfig:"time_starts_at"`
+	APIAddress        string `env:"API_ADDRESS, required"`
+	ClientID          string `env:"CLIENT_ID, required"`
+	ClientSecret      string `env:"CLIENT_SECRET, required"`
+	OrgPrefix         string `env:"ORG_PREFIX, required"`
+	NotifyDays        int    `env:"NOTIFY_DAYS, default=25"`
+	PurgeDays         int    `env:"PURGE_DAYS, default=30"`
+	MailSender        string `env:"MAIL_SENDER, required"`
+	NotifyMailSubject string `env:"NOTIFY_MAIL_SUBJECT, required"`
+	PurgeMailSubject  string `env:"PURGE_MAIL_SUBJECT, required"`
+	DryRun            bool   `env:"DRY_RUN, default=true"`
+	TimeStartsAt      string `env:"TIME_STARTS_AT"`
 	sandbox.SMTPOptions
 }
 
 func main() {
 	var opts Options
-	if err := envconfig.Process("", &opts); err != nil {
+	ctx := context.Background()
+
+	if err := envconfig.Process(ctx, &opts); err != nil {
 		log.Fatalf("error parsing options: %s", err.Error())
 	}
 
