@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/cloudfoundry-community/go-cfclient/v3 v3.0.0-alpha.6
 	github.com/google/go-cmp v0.6.0
-	github.com/kelseyhightower/envconfig v1.4.0
+	github.com/sethvargo/go-envconfig v1.0.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 )
 
