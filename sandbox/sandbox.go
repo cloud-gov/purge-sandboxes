@@ -17,11 +17,11 @@ import (
 
 // SMTPOptions describes configation for sending mail via SMTP
 type SMTPOptions struct {
-	SMTPHost string `envconfig:"smtp_host" required:"true"`
-	SMTPPort int    `envconfig:"smtp_port" default:"587"`
-	SMTPUser string `envconfig:"smtp_user" required:"true"`
-	SMTPPass string `envconfig:"smtp_pass" required:"true"`
-	SMTPCert string `envconfig:"smtp_cert"`
+	SMTPHost string `env:"SMTP_HOST, required"`
+	SMTPPort int    `env:"SMTP_PORT, default=587"`
+	SMTPUser string `env:"SMTP_USER, required"`
+	SMTPPass string `env:"SMTP_PASS, required"`
+	SMTPCert string `env:"SMTP_CERT"`
 }
 
 // ListRecipients get a list of recipient emails from space users
