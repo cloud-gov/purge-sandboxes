@@ -2,7 +2,6 @@ package sandbox_test
 
 import (
 	"html/template"
-	"io/ioutil"
 	"os"
 	"testing"
 	"time"
@@ -541,12 +540,12 @@ func TestRenderTemplate(t *testing.T) {
 			}
 			if test.expectedTestFile != "" {
 				if os.Getenv("OVERRIDE_TEMPLATES") == "1" {
-					err := ioutil.WriteFile(test.expectedTestFile, []byte(renderedTemplate), 0644)
+					err := os.WriteFile(test.expectedTestFile, []byte(renderedTemplate), 0644)
 					if err != nil {
 						t.Fatalf("unexpected error: %s", err)
 					}
 				}
-				expected, err := ioutil.ReadFile(test.expectedTestFile)
+				expected, err := os.ReadFile(test.expectedTestFile)
 				if err != nil {
 					t.Fatalf("unexpected error: %s", err)
 				}
