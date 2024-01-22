@@ -71,13 +71,13 @@ func RecreateSpaceDevsAndManagers(
 	managers []string,
 ) error {
 	for _, developerGUID := range developers {
-		_, err := cfClient.Roles.CreateSpaceRole(context.Background(), spaceGUID, developerGUID, resource.SpaceRoleDeveloper)
+		_, err := cfClient.Roles.CreateSpaceRole(ctx, spaceGUID, developerGUID, resource.SpaceRoleDeveloper)
 		if err != nil {
 			return err
 		}
 	}
 	for _, managerGUID := range managers {
-		_, err := cfClient.Roles.CreateSpaceRole(context.Background(), spaceGUID, managerGUID, resource.SpaceRoleManager)
+		_, err := cfClient.Roles.CreateSpaceRole(ctx, spaceGUID, managerGUID, resource.SpaceRoleManager)
 		if err != nil {
 			return err
 		}
@@ -86,10 +86,10 @@ func RecreateSpaceDevsAndManagers(
 }
 
 // PurgeSpace deletes a space; if the delete fails, it deletes all applications within the space
-func PurgeSpace(cfClient *client.Client, space *resource.Space) error {
-	_, spaceErr := cfClient.Spaces.Delete(context.Background(), space.GUID)
+func PurgeSpace(ctx context.Context, cfClient *client.Client, space *resource.Space) error {
+	_, spaceErr := cfClient.Spaces.Delete(ctx, space.GUID)
 	if spaceErr != nil {
-		apps, err := cfClient.Applications.ListAll(context.Background(), &client.AppListOptions{
+		apps, err := cfClient.Applications.ListAll(ctx, &client.AppListOptions{
 			SpaceGUIDs: client.Filter{
 				Values: []string{space.GUID},
 			},
@@ -98,7 +98,7 @@ func PurgeSpace(cfClient *client.Client, space *resource.Space) error {
 			return err
 		}
 		for _, app := range apps {
-			_, err := cfClient.Applications.Delete(context.Background(), app.GUID)
+			_, err := cfClient.Applications.Delete(ctx, app.GUID)
 			if err != nil {
 				return err
 			}

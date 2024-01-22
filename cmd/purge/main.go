@@ -170,7 +170,7 @@ func main() {
 					log.Fatalf("error sending mail on space %s: %s", details.Space.Name, err.Error())
 				}
 				log.Printf("deleting and recreating space %s", details.Space.Name)
-				if err := sandbox.PurgeSpace(cfClient, details.Space); err != nil {
+				if err := sandbox.PurgeSpace(ctx, cfClient, details.Space); err != nil {
 					purgeErrors = append(purgeErrors, fmt.Sprintf("error purging space %s in org %s: %s", details.Space.Name, org.Name, err.Error()))
 					break
 				}
