@@ -1,10 +1,19 @@
 ---
 jobs:
+- name: set-self
+  plan:
+  - in_parallel:
+    - get: sandbox-source
+      trigger: true
+  - set_pipeline: self
+    file: sandbox-source/ci/pipeline.yml
+
 - name: test
   plan:
   - in_parallel:
     - get: sandbox-source
       trigger: true
+      passed: [set-self]
     - get: general-task
   - task: test
     image: general-task
