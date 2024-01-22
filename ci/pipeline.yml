@@ -23,7 +23,7 @@ jobs:
     file: sandbox-source/ci/purge.yml
     image: general-task
     params:
-      API_ADDRESS: ((api-url-staging))
+      API_ADDRESS: ((staging-cf-api-url))
       CLIENT_ID: ((client-id-staging))
       CLIENT_SECRET: ((client-secret-staging))
       ORG_PREFIX: ((org-prefix))
@@ -45,14 +45,14 @@ jobs:
       text: |
         :x: FAILED to notify sandbox users on staging
         <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
-      channel: '#cg-platform-news'
+      channel: ((slack-channel-failure))
       username: ((slack-username))
       icon_url: ((slack-icon-url))
   on_success:
     put: slack
     params:
       <<: *slack-params
-      channel: '#cg-platform-news'
+      channel: ((slack-channel-success))
       text: |
         :white_check_mark: Successfully notified sandbox users on staging
         <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
@@ -69,7 +69,7 @@ jobs:
     file: sandbox-source/ci/purge.yml
     image: general-task
     params:
-      API_ADDRESS: ((api-url-production))
+      API_ADDRESS: ((prod-cf-api-url))
       CLIENT_ID: ((client-id-production))
       CLIENT_SECRET: ((client-secret-production))
       ORG_PREFIX: ((org-prefix))
@@ -89,7 +89,7 @@ jobs:
     put: slack
     params:
       <<: *slack-params
-      channel: '#cg-platform'
+      channel: ((slack-channel-failure))
       text: |
         :x: FAILED to notify sandbox users on production
         <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
@@ -97,7 +97,7 @@ jobs:
     put: slack
     params:
       <<: *slack-params
-      channel: '#cg-platform-news'
+      channel: ((slack-channel-success))
       text: |
         :white_check_mark: Successfully notified sandbox users on production
         <$ATC_EXTERNAL_URL/teams/$BUILD_TEAM_NAME/pipelines/$BUILD_PIPELINE_NAME/jobs/$BUILD_JOB_NAME/builds/$BUILD_NAME|View build details>
@@ -107,8 +107,8 @@ resources:
   type: git
   source:
     commit_verification_keys: ((cloud-gov-pgp-keys))
-    uri: ((sandbox-source-uri))
-    branch: ((sandbox-source-branch))
+    uri: https://github.com/cloud-gov/cg-sandbox
+    branch: update-golang-version-deps
 
 - name: schedule
   type: cron-resource
