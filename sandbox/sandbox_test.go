@@ -1,4 +1,4 @@
-package sandbox_test
+package sandbox
 
 import (
 	"html/template"
@@ -8,8 +8,6 @@ import (
 
 	"github.com/cloudfoundry-community/go-cfclient/v3/resource"
 	"github.com/google/go-cmp/cmp"
-
-	"github.com/18f/cg-sandbox/sandbox"
 )
 
 func TestListRecipients(t *testing.T) {
@@ -43,7 +41,7 @@ func TestListRecipients(t *testing.T) {
 	}
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
-			recipients, err := sandbox.ListRecipients(test.userGUIDs, test.users)
+			recipients, err := ListRecipients(test.userGUIDs, test.users)
 			if (test.expectedErr == "" && err != nil) || (test.expectedErr != "" && test.expectedErr != err.Error()) {
 				t.Fatalf("expected error: %s, got: %s", test.expectedErr, err)
 			}
@@ -134,7 +132,7 @@ func TestListSpaceDevsAndManagers(t *testing.T) {
 	}
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
-			devs, managers := sandbox.ListSpaceDevsAndManagers(test.userGUIDs, test.roles)
+			devs, managers := ListSpaceDevsAndManagers(test.userGUIDs, test.roles)
 			if diff := cmp.Diff(test.expectedDevs, devs); diff != "" {
 				t.Errorf("ListSpaceDevsAndManagers() mismatch (-want +got):\n%s", diff)
 			}
@@ -152,8 +150,8 @@ func TestListPurgeSpaces(t *testing.T) {
 		apps             []*resource.App
 		instances        []*resource.ServiceInstance
 		now              time.Time
-		expectedToNotify []sandbox.SpaceDetails
-		expectedToPurge  []sandbox.SpaceDetails
+		expectedToNotify []SpaceDetails
+		expectedToPurge  []SpaceDetails
 		notifyThreshold  int
 		purgeThreshold   int
 		expectedErr      string
@@ -211,7 +209,7 @@ func TestListPurgeSpaces(t *testing.T) {
 			notifyThreshold: 25,
 			purgeThreshold:  30,
 			timeStartsAt:    time.Time{},
-			expectedToNotify: []sandbox.SpaceDetails{
+			expectedToNotify: []SpaceDetails{
 				{
 					Timestamp: now.Add(-28 * 24 * time.Hour).Truncate(24 * time.Hour),
 					Space: &resource.Space{
@@ -241,7 +239,7 @@ func TestListPurgeSpaces(t *testing.T) {
 			notifyThreshold: 25,
 			purgeThreshold:  30,
 			timeStartsAt:    time.Time{},
-			expectedToNotify: []sandbox.SpaceDetails{
+			expectedToNotify: []SpaceDetails{
 				{
 					Timestamp: now.Add(-25 * 24 * time.Hour).Truncate(24 * time.Hour),
 					Space: &resource.Space{
@@ -271,7 +269,7 @@ func TestListPurgeSpaces(t *testing.T) {
 			notifyThreshold: 25,
 			purgeThreshold:  30,
 			timeStartsAt:    time.Time{},
-			expectedToPurge: []sandbox.SpaceDetails{
+			expectedToPurge: []SpaceDetails{
 				{
 					Timestamp: now.Add(-30 * 24 * time.Hour).Truncate(24 * time.Hour),
 					Space: &resource.Space{
@@ -301,7 +299,7 @@ func TestListPurgeSpaces(t *testing.T) {
 			notifyThreshold: 25,
 			purgeThreshold:  30,
 			timeStartsAt:    time.Time{},
-			expectedToPurge: []sandbox.SpaceDetails{
+			expectedToPurge: []SpaceDetails{
 				{
 					Timestamp: now.Add(-31 * 24 * time.Hour).Truncate(24 * time.Hour),
 					Space: &resource.Space{
@@ -331,7 +329,7 @@ func TestListPurgeSpaces(t *testing.T) {
 			notifyThreshold: 25,
 			purgeThreshold:  30,
 			timeStartsAt:    now.Add(-60 * 24 * time.Hour),
-			expectedToPurge: []sandbox.SpaceDetails{
+			expectedToPurge: []SpaceDetails{
 				{
 					Timestamp: now.Add(-31 * 24 * time.Hour).Truncate(24 * time.Hour),
 					Space: &resource.Space{
@@ -365,7 +363,7 @@ func TestListPurgeSpaces(t *testing.T) {
 	}
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
-			toNotify, toPurge, err := sandbox.ListPurgeSpaces(
+			toNotify, toPurge, err := ListPurgeSpaces(
 				test.spaces,
 				test.apps,
 				test.instances,
@@ -468,7 +466,7 @@ func TestGetFirstResource(t *testing.T) {
 	}
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
-			firstResource, err := sandbox.GetFirstResource(
+			firstResource, err := GetFirstResource(
 				test.space,
 				test.apps,
 				test.instances,
@@ -531,7 +529,7 @@ func TestRenderTemplate(t *testing.T) {
 	}
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
-			renderedTemplate, err := sandbox.RenderTemplate(
+			renderedTemplate, err := RenderTemplate(
 				test.tpl,
 				test.data,
 			)
