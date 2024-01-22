@@ -1,298 +1,556 @@
-package sandbox_test
+package sandbox
 
 import (
 	"html/template"
-	"io/ioutil"
 	"os"
+	"testing"
 	"time"
 
-	"github.com/cloudfoundry-community/go-cfclient"
-
-	"github.com/18f/cg-sandbox/sandbox"
-
-	. "github.com/onsi/ginkgo"
-	. "github.com/onsi/gomega"
+	"github.com/cloudfoundry-community/go-cfclient/v3/resource"
+	"github.com/google/go-cmp/cmp"
 )
 
-var _ = Describe("Sandbox", func() {
-	Describe("ListRecipients", func() {
-		var (
-			userGUIDs map[string]bool
-			roles     []cfclient.SpaceRole
-		)
-
-		It("skips users not in guids map", func() {
-			userGUIDs = map[string]bool{
+func TestListRecipients(t *testing.T) {
+	testCases := map[string]struct {
+		userGUIDs          map[string]bool
+		users              []*resource.User
+		expectedRecipients []string
+		expectedErr        string
+	}{
+		"skips users not in GUIDs map": {
+			userGUIDs: map[string]bool{
 				"user-1": true,
 				"user-2": true,
-			}
-			roles = []cfclient.SpaceRole{
-				{Guid: "user-1", SpaceRoles: []string{"space_developer", "space_manager"}},
-				{Guid: "user-2", SpaceRoles: []string{"space_developer"}},
-				{Guid: "user-3", SpaceRoles: []string{"space_developer"}},
-			}
-			_, developers, managers := sandbox.ListRecipients(userGUIDs, roles)
-			Expect(developers).To(Equal([]string{"user-1", "user-2"}))
-			Expect(managers).To(Equal([]string{"user-1"}))
-		})
-
-		It("parses email addresses", func() {
-			userGUIDs = map[string]bool{
+			},
+			users: []*resource.User{
+				{GUID: "user-1", Username: "foo1@bar.gov"},
+				{GUID: "user-2", Username: "foo2@bar.gov"},
+				{GUID: "user-3", Username: "foo3@bar.gov"},
+			},
+			expectedRecipients: []string{"foo1@bar.gov", "foo2@bar.gov"},
+		},
+		"returns error for missing username": {
+			userGUIDs: map[string]bool{
 				"user-1": true,
+			},
+			users: []*resource.User{
+				{GUID: "user-1"},
+			},
+			expectedErr: "mail: no address",
+		},
+	}
+	for name, test := range testCases {
+		t.Run(name, func(t *testing.T) {
+			recipients, err := ListRecipients(test.userGUIDs, test.users)
+			if (test.expectedErr == "" && err != nil) || (test.expectedErr != "" && test.expectedErr != err.Error()) {
+				t.Fatalf("expected error: %s, got: %s", test.expectedErr, err)
 			}
-			roles = []cfclient.SpaceRole{
-				{Guid: "user-1", SpaceRoles: []string{"space_developer"}, Username: "foo@bar.gov"},
-				{Guid: "user-2", SpaceRoles: []string{"space_manager"}},
+			if diff := cmp.Diff(test.expectedRecipients, recipients); diff != "" {
+				t.Errorf("ListRecipients() mismatch (-want +got):\n%s", diff)
 			}
-			addresses, _, _ := sandbox.ListRecipients(userGUIDs, roles)
-			Expect(addresses).To(Equal([]string{"foo@bar.gov"}))
 		})
-	})
+	}
+}
 
-	Describe("ListPurgeSpaces", func() {
-		var (
-			spaces    []cfclient.Space
-			apps      []cfclient.App
-			instances []cfclient.ServiceInstance
-			now       time.Time
-		)
-
-		BeforeEach(func() {
-			spaces = []cfclient.Space{
-				{Guid: "space-guid"},
-			}
-			now = time.Now().Truncate(24 * time.Hour)
-		})
-
-		It("skips empty spaces", func() {
-			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(toNotify).To(HaveLen(0))
-			Expect(toPurge).To(HaveLen(0))
-		})
-
-		It("skips spaces with recent resources", func() {
-			apps = []cfclient.App{
+func TestListSpaceDevsAndManagers(t *testing.T) {
+	testCases := map[string]struct {
+		userGUIDs        map[string]bool
+		roles            []*resource.Role
+		expectedDevs     []string
+		expectedManagers []string
+		expectedErr      string
+	}{
+		"returns correct devs and managers": {
+			userGUIDs: map[string]bool{
+				"user-1": true,
+				"user-2": true,
+			},
+			roles: []*resource.Role{
 				{
-					Guid:      "app-guid",
-					SpaceGuid: "space-guid",
-					CreatedAt: now.Add(-15 * 24 * time.Hour).Format(time.RFC3339Nano),
-				},
-			}
-			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(toNotify).To(HaveLen(0))
-			Expect(toPurge).To(HaveLen(0))
-		})
-
-		It("notifies on spaces between thresholds", func() {
-			apps = []cfclient.App{
-				{
-					Guid:      "app-guid",
-					SpaceGuid: "space-guid",
-					CreatedAt: now.Add(-28 * 24 * time.Hour).Format(time.RFC3339Nano),
-				},
-			}
-			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(toNotify).To(HaveLen(1))
-			Expect(toPurge).To(HaveLen(0))
-		})
-
-		It("notifies on the notify threshold", func() {
-			apps = []cfclient.App{
-				{
-					Guid:      "app-guid",
-					SpaceGuid: "space-guid",
-					CreatedAt: now.Add(-25 * 24 * time.Hour).Format(time.RFC3339Nano),
-				},
-			}
-			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(toNotify).To(HaveLen(1))
-			Expect(toPurge).To(HaveLen(0))
-		})
-
-		It("purges on the purge threshold", func() {
-			apps = []cfclient.App{
-				{
-					Guid:      "app-guid",
-					SpaceGuid: "space-guid",
-					CreatedAt: now.Add(-30 * 24 * time.Hour).Format(time.RFC3339Nano),
-				},
-			}
-			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(toNotify).To(HaveLen(0))
-			Expect(toPurge).To(HaveLen(1))
-		})
-
-		It("purges after the purge threshold", func() {
-			apps = []cfclient.App{
-				{
-					Guid:      "app-guid",
-					SpaceGuid: "space-guid",
-					CreatedAt: now.Add(-31 * 24 * time.Hour).Format(time.RFC3339Nano),
-				},
-			}
-			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(toNotify).To(HaveLen(0))
-			Expect(toPurge).To(HaveLen(1))
-		})
-
-		It("purges after the purge threshold when time starts in the past", func() {
-			apps = []cfclient.App{
-				{
-					Guid:      "app-guid",
-					SpaceGuid: "space-guid",
-					CreatedAt: now.Add(-31 * 24 * time.Hour).Format(time.RFC3339Nano),
-				},
-			}
-			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, now.Add(-60*24*time.Hour))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(toNotify).To(HaveLen(0))
-			Expect(toPurge).To(HaveLen(1))
-		})
-
-		It("skips purge when time starts after last timestamp", func() {
-			apps = []cfclient.App{
-				{
-					Guid:      "app-guid",
-					SpaceGuid: "space-guid",
-					CreatedAt: now.Add(-31 * 24 * time.Hour).Format(time.RFC3339Nano),
-				},
-			}
-			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, now)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(toNotify).To(HaveLen(0))
-			Expect(toPurge).To(HaveLen(0))
-		})
-	})
-
-	Describe("GetFirstResource", func() {
-		var (
-			space     cfclient.Space
-			apps      []cfclient.App
-			instances []cfclient.ServiceInstance
-		)
-
-		BeforeEach(func() {
-			space = cfclient.Space{
-				Guid: "space-guid",
-			}
-		})
-
-		It("returns the zero value for an empty space", func() {
-			firstResource, err := sandbox.GetFirstResource(space, apps, instances)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(firstResource.IsZero()).To(BeTrue())
-		})
-
-		It("returns the timestamp of the earliest app", func() {
-			now := time.Now()
-			apps = []cfclient.App{
-				{
-					Guid:      "app-guid",
-					SpaceGuid: "space-guid",
-					CreatedAt: now.Add(-10 * 24 * time.Hour).Format(time.RFC3339Nano),
-				},
-			}
-			instances = []cfclient.ServiceInstance{
-				{
-					Guid:      "instance-guid",
-					SpaceGuid: "space-guid",
-					CreatedAt: now.Add(-5 * 24 * time.Hour).Format(time.RFC3339Nano),
-				},
-			}
-			firstResource, err := sandbox.GetFirstResource(space, apps, instances)
-			Expect(err).NotTo(HaveOccurred())
-			firstResource.Equal(now.Add(-10 * 24 * time.Hour))
-		})
-
-		It("returns the timestamp of the earliest instance", func() {
-			now := time.Now()
-			apps = []cfclient.App{
-				{
-					Guid:      "app-guid",
-					SpaceGuid: "space-guid",
-					CreatedAt: now.Add(-5 * 24 * time.Hour).Format(time.RFC3339Nano),
-				},
-			}
-			instances = []cfclient.ServiceInstance{
-				{
-					Guid:      "instance-guid",
-					SpaceGuid: "space-guid",
-					CreatedAt: now.Add(-10 * 24 * time.Hour).Format(time.RFC3339Nano),
-				},
-			}
-			firstResource, err := sandbox.GetFirstResource(space, apps, instances)
-			Expect(err).NotTo(HaveOccurred())
-			firstResource.Equal(now.Add(-10 * 24 * time.Hour))
-		})
-	})
-	Describe("RenderTemplate", func() {
-		var (
-			tpl              *template.Template
-			data             map[string]interface{}
-			err              error
-			expectedTestFile string
-		)
-		Context("NotifyTemplate", func() {
-			BeforeEach(func() {
-				tpl, err = template.ParseFiles("../templates/base.html", "../templates/notify.tmpl")
-				data = map[string]interface{}{
-					"org": cfclient.Org{
-						Name: "test-org",
+					Type: "space_developer",
+					Relationships: resource.RoleSpaceUserOrganizationRelationships{
+						User: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "user-1",
+							},
+						},
 					},
-					"space": cfclient.Space{
-						Name: "test-space",
+				},
+				{
+					Type: "space_manager",
+					Relationships: resource.RoleSpaceUserOrganizationRelationships{
+						User: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "user-1",
+							},
+						},
 					},
-					"date": time.Date(2009, 11, 17, 20, 34, 58, 651387237, time.UTC),
-					"days": 90,
-				}
-				expectedTestFile = "../testdata/notify.html"
-				Expect(err).NotTo(HaveOccurred())
-			})
-			It("constructs the appropriate notify template", func() {
-				renderedTemplate, err := sandbox.RenderTemplate(tpl, data)
-				Expect(err).NotTo(HaveOccurred())
+				},
+				{
+					Type: "space_developer",
+					Relationships: resource.RoleSpaceUserOrganizationRelationships{
+						User: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "user-2",
+							},
+						},
+					},
+				},
+			},
+			expectedDevs:     []string{"user-1", "user-2"},
+			expectedManagers: []string{"user-1"},
+		},
+		"skips users not in user GUIDs map": {
+			userGUIDs: map[string]bool{
+				"user-1": true,
+			},
+			roles: []*resource.Role{
+				{
+					Type: "space_developer",
+					Relationships: resource.RoleSpaceUserOrganizationRelationships{
+						User: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "user-1",
+							},
+						},
+					},
+				},
+				{
+					Type: "space_developer",
+					Relationships: resource.RoleSpaceUserOrganizationRelationships{
+						User: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "user-2",
+							},
+						},
+					},
+				},
+			},
+			expectedDevs:     []string{"user-1"},
+			expectedManagers: []string{},
+		},
+	}
+	for name, test := range testCases {
+		t.Run(name, func(t *testing.T) {
+			devs, managers := ListSpaceDevsAndManagers(test.userGUIDs, test.roles)
+			if diff := cmp.Diff(test.expectedDevs, devs); diff != "" {
+				t.Errorf("ListSpaceDevsAndManagers() mismatch (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(test.expectedManagers, managers); diff != "" {
+				t.Errorf("ListSpaceDevsAndManagers() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestListPurgeSpaces(t *testing.T) {
+	now := time.Now()
+	testCases := map[string]struct {
+		spaces           []*resource.Space
+		apps             []*resource.App
+		instances        []*resource.ServiceInstance
+		now              time.Time
+		expectedToNotify []SpaceDetails
+		expectedToPurge  []SpaceDetails
+		notifyThreshold  int
+		purgeThreshold   int
+		expectedErr      string
+		timeStartsAt     time.Time
+	}{
+		"skips empty spaces": {
+			spaces: []*resource.Space{
+				{GUID: "space-guid"},
+			},
+			now:             now.Truncate(24 * time.Hour),
+			notifyThreshold: 25,
+			purgeThreshold:  30,
+			timeStartsAt:    time.Time{},
+		},
+		"skips spaces with recent resources": {
+			spaces: []*resource.Space{
+				{GUID: "space-guid"},
+			},
+			now: now.Truncate(24 * time.Hour),
+			apps: []*resource.App{
+				{
+					GUID: "app-guid",
+					Relationships: resource.SpaceRelationship{
+						Space: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-15 * 24 * time.Hour),
+				},
+			},
+			notifyThreshold: 25,
+			purgeThreshold:  30,
+			timeStartsAt:    time.Time{},
+		},
+		"notifies on spaces between thresholds": {
+			spaces: []*resource.Space{
+				{GUID: "space-guid"},
+			},
+			now: now.Truncate(24 * time.Hour),
+			apps: []*resource.App{
+				{
+					GUID: "app-guid",
+					Relationships: resource.SpaceRelationship{
+						Space: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-28 * 24 * time.Hour),
+				},
+			},
+			notifyThreshold: 25,
+			purgeThreshold:  30,
+			timeStartsAt:    time.Time{},
+			expectedToNotify: []SpaceDetails{
+				{
+					Timestamp: now.Add(-28 * 24 * time.Hour).Truncate(24 * time.Hour),
+					Space: &resource.Space{
+						GUID: "space-guid",
+					},
+				},
+			},
+		},
+		"notifies on the notify threshold": {
+			spaces: []*resource.Space{
+				{GUID: "space-guid"},
+			},
+			now: now.Truncate(24 * time.Hour),
+			apps: []*resource.App{
+				{
+					GUID: "app-guid",
+					Relationships: resource.SpaceRelationship{
+						Space: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-25 * 24 * time.Hour),
+				},
+			},
+			notifyThreshold: 25,
+			purgeThreshold:  30,
+			timeStartsAt:    time.Time{},
+			expectedToNotify: []SpaceDetails{
+				{
+					Timestamp: now.Add(-25 * 24 * time.Hour).Truncate(24 * time.Hour),
+					Space: &resource.Space{
+						GUID: "space-guid",
+					},
+				},
+			},
+		},
+		"purges on the purge threshold": {
+			spaces: []*resource.Space{
+				{GUID: "space-guid"},
+			},
+			now: now.Truncate(24 * time.Hour),
+			apps: []*resource.App{
+				{
+					GUID: "app-guid",
+					Relationships: resource.SpaceRelationship{
+						Space: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-30 * 24 * time.Hour),
+				},
+			},
+			notifyThreshold: 25,
+			purgeThreshold:  30,
+			timeStartsAt:    time.Time{},
+			expectedToPurge: []SpaceDetails{
+				{
+					Timestamp: now.Add(-30 * 24 * time.Hour).Truncate(24 * time.Hour),
+					Space: &resource.Space{
+						GUID: "space-guid",
+					},
+				},
+			},
+		},
+		"purges after the purge threshold": {
+			spaces: []*resource.Space{
+				{GUID: "space-guid"},
+			},
+			now: now.Truncate(24 * time.Hour),
+			apps: []*resource.App{
+				{
+					GUID: "app-guid",
+					Relationships: resource.SpaceRelationship{
+						Space: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-31 * 24 * time.Hour),
+				},
+			},
+			notifyThreshold: 25,
+			purgeThreshold:  30,
+			timeStartsAt:    time.Time{},
+			expectedToPurge: []SpaceDetails{
+				{
+					Timestamp: now.Add(-31 * 24 * time.Hour).Truncate(24 * time.Hour),
+					Space: &resource.Space{
+						GUID: "space-guid",
+					},
+				},
+			},
+		},
+		"purges after the purge threshold when time starts in the past": {
+			spaces: []*resource.Space{
+				{GUID: "space-guid"},
+			},
+			now: now.Truncate(24 * time.Hour),
+			apps: []*resource.App{
+				{
+					GUID: "app-guid",
+					Relationships: resource.SpaceRelationship{
+						Space: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-31 * 24 * time.Hour),
+				},
+			},
+			notifyThreshold: 25,
+			purgeThreshold:  30,
+			timeStartsAt:    now.Add(-60 * 24 * time.Hour),
+			expectedToPurge: []SpaceDetails{
+				{
+					Timestamp: now.Add(-31 * 24 * time.Hour).Truncate(24 * time.Hour),
+					Space: &resource.Space{
+						GUID: "space-guid",
+					},
+				},
+			},
+		},
+		"skips purge when time starts after last timestamp": {
+			spaces: []*resource.Space{
+				{GUID: "space-guid"},
+			},
+			now: now.Truncate(24 * time.Hour),
+			apps: []*resource.App{
+				{
+					GUID: "app-guid",
+					Relationships: resource.SpaceRelationship{
+						Space: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-31 * 24 * time.Hour),
+				},
+			},
+			notifyThreshold: 25,
+			purgeThreshold:  30,
+			timeStartsAt:    now,
+		},
+	}
+	for name, test := range testCases {
+		t.Run(name, func(t *testing.T) {
+			toNotify, toPurge, err := ListPurgeSpaces(
+				test.spaces,
+				test.apps,
+				test.instances,
+				test.now,
+				test.notifyThreshold,
+				test.purgeThreshold,
+				test.timeStartsAt,
+			)
+			if (test.expectedErr == "" && err != nil) || (test.expectedErr != "" && test.expectedErr != err.Error()) {
+				t.Fatalf("expected error: %s, got: %s", test.expectedErr, err)
+			}
+			if diff := cmp.Diff(test.expectedToNotify, toNotify); diff != "" {
+				t.Errorf("ListPurgeSpaces() mismatch toNotify (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(test.expectedToPurge, toPurge); diff != "" {
+				t.Errorf("ListPurgeSpaces() mismatch toPurge (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestGetFirstResource(t *testing.T) {
+	now := time.Now()
+	testCases := map[string]struct {
+		space                 *resource.Space
+		apps                  []*resource.App
+		instances             []*resource.ServiceInstance
+		expectedFirstResource time.Time
+		expectedErr           string
+	}{
+		"skips empty spaces": {
+			space: &resource.Space{
+				GUID: "space-guid",
+			},
+		},
+		"returns the timestamp of the earliest app": {
+			space: &resource.Space{
+				GUID: "space-guid",
+			},
+			apps: []*resource.App{
+				{
+					GUID: "app-guid",
+					Relationships: resource.SpaceRelationship{
+						Space: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-10 * 24 * time.Hour),
+				},
+			},
+			instances: []*resource.ServiceInstance{
+				{
+					GUID: "instance-guid",
+					Relationships: resource.ServiceInstanceRelationships{
+						Space: &resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-5 * 24 * time.Hour),
+				},
+			},
+			expectedFirstResource: now.Add(-10 * 24 * time.Hour),
+		},
+		"returns the timestamp of the earliest instance": {
+			space: &resource.Space{
+				GUID: "space-guid",
+			},
+			apps: []*resource.App{
+				{
+					GUID: "app-guid",
+					Relationships: resource.SpaceRelationship{
+						Space: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-5 * 24 * time.Hour),
+				},
+			},
+			instances: []*resource.ServiceInstance{
+				{
+					GUID: "instance-guid",
+					Relationships: resource.ServiceInstanceRelationships{
+						Space: &resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-10 * 24 * time.Hour),
+				},
+			},
+			expectedFirstResource: now.Add(-10 * 24 * time.Hour),
+		},
+	}
+	for name, test := range testCases {
+		t.Run(name, func(t *testing.T) {
+			firstResource, err := GetFirstResource(
+				test.space,
+				test.apps,
+				test.instances,
+			)
+			if (test.expectedErr == "" && err != nil) || (test.expectedErr != "" && test.expectedErr != err.Error()) {
+				t.Fatalf("expected error: %s, got: %s", test.expectedErr, err)
+			}
+			if !cmp.Equal(test.expectedFirstResource, firstResource) {
+				t.Errorf("GetFirstResource() expected: %s, got: %s", test.expectedFirstResource, firstResource)
+			}
+		})
+	}
+}
+
+func TestRenderTemplate(t *testing.T) {
+	notifyTemplate, err := template.ParseFiles("../templates/base.html", "../templates/notify.tmpl")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	purgeTemplate, err := template.ParseFiles("../templates/base.html", "../templates/purge.tmpl")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	testCases := map[string]struct {
+		tpl              *template.Template
+		data             map[string]interface{}
+		expectedErr      string
+		expectedTestFile string
+	}{
+		"constructs the appropriate notify template": {
+			tpl: notifyTemplate,
+			data: map[string]interface{}{
+				"org": &resource.Organization{
+					Name: "test-org",
+				},
+				"space": &resource.Space{
+					Name: "test-space",
+				},
+				"date": time.Date(2009, 11, 17, 20, 34, 58, 651387237, time.UTC),
+				"days": 90,
+			},
+			expectedTestFile: "../testdata/notify.html",
+		},
+		"constructs the appropriate purge template": {
+			tpl: purgeTemplate,
+			data: map[string]interface{}{
+				"org": &resource.Organization{
+					Name: "test-org",
+				},
+				"space": &resource.Space{
+					Name: "test-space",
+				},
+				"date": time.Date(2009, 11, 17, 20, 34, 58, 651387237, time.UTC),
+				"days": 90,
+			},
+			expectedTestFile: "../testdata/purge.html",
+		},
+	}
+	for name, test := range testCases {
+		t.Run(name, func(t *testing.T) {
+			renderedTemplate, err := RenderTemplate(
+				test.tpl,
+				test.data,
+			)
+			if (test.expectedErr == "" && err != nil) || (test.expectedErr != "" && test.expectedErr != err.Error()) {
+				t.Fatalf("expected error: %s, got: %s", test.expectedErr, err)
+			}
+			if test.expectedTestFile != "" {
 				if os.Getenv("OVERRIDE_TEMPLATES") == "1" {
-					err := ioutil.WriteFile(expectedTestFile, []byte(renderedTemplate), 0644)
-					Expect(err).NotTo(HaveOccurred())
+					err := os.WriteFile(test.expectedTestFile, []byte(renderedTemplate), 0644)
+					if err != nil {
+						t.Fatalf("unexpected error: %s", err)
+					}
 				}
-				expected, err := ioutil.ReadFile(expectedTestFile)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(renderedTemplate).To(Equal(string(expected)))
-			})
+				expected, err := os.ReadFile(test.expectedTestFile)
+				if err != nil {
+					t.Fatalf("unexpected error: %s", err)
+				}
+				if diff := cmp.Diff(string(expected), renderedTemplate); diff != "" {
+					t.Errorf("RenderTemplate() mismatch (-want +got):\n%s", diff)
+				}
+			}
 		})
-		Context("PurgeTemplate", func() {
-			BeforeEach(func() {
-				tpl, err = template.ParseFiles("../templates/base.html", "../templates/purge.tmpl")
-				data = map[string]interface{}{
-					"org": cfclient.Org{
-						Name: "test-org",
-					},
-					"space": cfclient.Space{
-						Name: "test-space",
-					},
-					"date": time.Date(2009, 11, 17, 20, 34, 58, 651387237, time.UTC),
-					"days": 90,
-				}
-				expectedTestFile = "../testdata/purge.html"
-				Expect(err).NotTo(HaveOccurred())
-			})
-			It("constructs the appropriate notify template", func() {
-				renderedTemplate, err := sandbox.RenderTemplate(tpl, data)
-				Expect(err).NotTo(HaveOccurred())
-				if os.Getenv("OVERRIDE_TEMPLATES") == "1" {
-					err := ioutil.WriteFile(expectedTestFile, []byte(renderedTemplate), 0644)
-					Expect(err).NotTo(HaveOccurred())
-				}
-				expected, err := ioutil.ReadFile(expectedTestFile)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(renderedTemplate).To(Equal(string(expected)))
-			})
-		})
-	})
-})
+	}
+}

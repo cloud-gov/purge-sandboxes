@@ -2,62 +2,104 @@ package sandbox
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
 	"html/template"
 	"net/mail"
-	"net/url"
 	"strings"
 	"time"
 
-	"github.com/cloudfoundry-community/go-cfclient"
+	"github.com/cloudfoundry-community/go-cfclient/v3/client"
+	"github.com/cloudfoundry-community/go-cfclient/v3/resource"
 	"gopkg.in/gomail.v2"
 )
 
 // SMTPOptions describes configation for sending mail via SMTP
 type SMTPOptions struct {
-	SMTPHost string `envconfig:"smtp_host" required:"true"`
-	SMTPPort int    `envconfig:"smtp_port" default:"587"`
-	SMTPUser string `envconfig:"smtp_user" required:"true"`
-	SMTPPass string `envconfig:"smtp_pass" required:"true"`
-	SMTPCert string `envconfig:"smtp_cert"`
+	SMTPHost string `env:"SMTP_HOST, required"`
+	SMTPPort int    `env:"SMTP_PORT, default=587"`
+	SMTPUser string `env:"SMTP_USER, required"`
+	SMTPPass string `env:"SMTP_PASS, required"`
+	SMTPCert string `env:"SMTP_CERT"`
 }
 
-// ListRecipients get a list of recipient emails from space roles
-func ListRecipients(userGUIDs map[string]bool, roles []cfclient.SpaceRole) (addresses, developers, managers []string) {
+// ListRecipients get a list of recipient emails from space users
+func ListRecipients(
+	userGUIDs map[string]bool,
+	spaceUsers []*resource.User,
+) (addresses []string, err error) {
 	addresses = []string{}
-	developers = []string{}
-	managers = []string{}
-	for _, role := range roles {
-		if _, ok := userGUIDs[role.Guid]; !ok {
+	for _, user := range spaceUsers {
+		if _, ok := userGUIDs[user.GUID]; !ok {
 			continue
 		}
-		if _, err := mail.ParseAddress(role.Username); err == nil {
-			addresses = append(addresses, role.Username)
+
+		if _, err := mail.ParseAddress(user.Username); err != nil {
+			return nil, err
 		}
-		for _, roleType := range role.SpaceRoles {
-			if roleType == "space_developer" {
-				developers = append(developers, role.Guid)
-			} else if roleType == "space_manager" {
-				managers = append(managers, role.Guid)
-			}
+		addresses = append(addresses, user.Username)
+	}
+	return addresses, nil
+}
+
+func ListSpaceDevsAndManagers(
+	userGUIDs map[string]bool,
+	spaceRoles []*resource.Role,
+) (developers []string, managers []string) {
+	developers = []string{}
+	managers = []string{}
+	for _, role := range spaceRoles {
+		if _, ok := userGUIDs[role.Relationships.User.Data.GUID]; !ok {
+			continue
+		}
+
+		if role.Type == resource.SpaceRoleDeveloper.String() {
+			developers = append(developers, role.Relationships.User.Data.GUID)
+		} else if role.Type == resource.SpaceRoleManager.String() {
+			managers = append(managers, role.Relationships.User.Data.GUID)
 		}
 	}
 	return
 }
 
+func RecreateSpaceDevsAndManagers(
+	ctx context.Context,
+	cfClient *client.Client,
+	spaceGUID string,
+	developers []string,
+	managers []string,
+) error {
+	for _, developerGUID := range developers {
+		_, err := cfClient.Roles.CreateSpaceRole(ctx, spaceGUID, developerGUID, resource.SpaceRoleDeveloper)
+		if err != nil {
+			return err
+		}
+	}
+	for _, managerGUID := range managers {
+		_, err := cfClient.Roles.CreateSpaceRole(ctx, spaceGUID, managerGUID, resource.SpaceRoleManager)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // PurgeSpace deletes a space; if the delete fails, it deletes all applications within the space
-func PurgeSpace(client *cfclient.Client, space cfclient.Space) error {
-	spaceErr := client.DeleteSpace(space.Guid, true, false)
+func PurgeSpace(ctx context.Context, cfClient *client.Client, space *resource.Space) error {
+	_, spaceErr := cfClient.Spaces.Delete(ctx, space.GUID)
 	if spaceErr != nil {
-		query := url.Values(map[string][]string{"q": []string{fmt.Sprintf("space_guid:%s", space.Guid)}})
-		apps, err := client.ListAppsByQuery(query)
+		apps, err := cfClient.Applications.ListAll(ctx, &client.AppListOptions{
+			SpaceGUIDs: client.Filter{
+				Values: []string{space.GUID},
+			},
+		})
 		if err != nil {
 			return err
 		}
 		for _, app := range apps {
-			if err := client.DeleteApp(app.Guid); err != nil {
+			_, err := cfClient.Applications.Delete(ctx, app.GUID)
+			if err != nil {
 				return err
 			}
 		}
@@ -112,10 +154,14 @@ func SendMail(
 }
 
 // ListSandboxOrgs lists all sandbox organizations
-func ListSandboxOrgs(client *cfclient.Client, prefix string) ([]cfclient.Org, error) {
-	sandboxes := []cfclient.Org{}
+func ListSandboxOrgs(
+	ctx context.Context,
+	client *client.Client,
+	prefix string,
+) ([]*resource.Organization, error) {
+	sandboxes := []*resource.Organization{}
 
-	orgs, err := client.ListOrgs()
+	orgs, err := client.Organizations.ListAll(ctx, nil)
 	if err != nil {
 		return sandboxes, err
 	}
@@ -131,27 +177,38 @@ func ListSandboxOrgs(client *cfclient.Client, prefix string) ([]cfclient.Org, er
 
 // ListOrgResources fetches apps, service instances, and spaces within an organization
 func ListOrgResources(
-	client *cfclient.Client,
-	org cfclient.Org,
+	ctx context.Context,
+	cfClient *client.Client,
+	org *resource.Organization,
 ) (
-	spaces []cfclient.Space,
-	apps []cfclient.App,
-	instances []cfclient.ServiceInstance,
+	spaces []*resource.Space,
+	apps []*resource.App,
+	instances []*resource.ServiceInstance,
 	err error,
 ) {
-	query := url.Values(map[string][]string{"q": []string{"organization_guid:" + org.Guid}})
-
-	apps, err = client.ListAppsByQuery(query)
+	apps, err = cfClient.Applications.ListAll(ctx, &client.AppListOptions{
+		OrganizationGUIDs: client.Filter{
+			Values: []string{org.GUID},
+		},
+	})
 	if err != nil {
 		return
 	}
 
-	instances, err = client.ListServiceInstancesByQuery(query)
+	instances, err = cfClient.ServiceInstances.ListAll(ctx, &client.ServiceInstanceListOptions{
+		OrganizationGUIDs: client.Filter{
+			Values: []string{org.GUID},
+		},
+	})
 	if err != nil {
 		return
 	}
 
-	spaces, err = client.OrgSpaces(org.Guid)
+	spaces, err = cfClient.Spaces.ListAll(ctx, &client.SpaceListOptions{
+		OrganizationGUIDs: client.Filter{
+			Values: []string{org.GUID},
+		},
+	})
 	if err != nil {
 		return
 	}
@@ -161,30 +218,22 @@ func ListOrgResources(
 
 // GetFirstResource gets the creation timestamp of the earliest-created resource in a space
 func GetFirstResource(
-	space cfclient.Space,
-	apps []cfclient.App,
-	instances []cfclient.ServiceInstance,
+	space *resource.Space,
+	apps []*resource.App,
+	instances []*resource.ServiceInstance,
 ) (time.Time, error) {
 	groupedApps := groupAppsBySpace(apps)
 	groupedInstances := groupInstancesBySpace(instances)
 
 	var firstResource time.Time
-	for _, app := range groupedApps[space.Guid] {
-		createdAt, err := time.Parse(time.RFC3339Nano, app.CreatedAt)
-		if err != nil {
-			return firstResource, err
-		}
-		if firstResource.IsZero() || createdAt.Before(firstResource) {
-			firstResource = createdAt
+	for _, app := range groupedApps[space.GUID] {
+		if firstResource.IsZero() || app.CreatedAt.Before(firstResource) {
+			firstResource = app.CreatedAt
 		}
 	}
-	for _, instance := range groupedInstances[space.Guid] {
-		createdAt, err := time.Parse(time.RFC3339Nano, instance.CreatedAt)
-		if err != nil {
-			return firstResource, err
-		}
-		if firstResource.IsZero() || createdAt.Before(firstResource) {
-			firstResource = createdAt
+	for _, instance := range groupedInstances[space.GUID] {
+		if firstResource.IsZero() || instance.CreatedAt.Before(firstResource) {
+			firstResource = instance.CreatedAt
 		}
 	}
 
@@ -194,14 +243,14 @@ func GetFirstResource(
 // SpaceDetails describes a space and its first resource creation time
 type SpaceDetails struct {
 	Timestamp time.Time
-	Space     cfclient.Space
+	Space     *resource.Space
 }
 
 // ListPurgeSpaces identifies spaces that will be notified or purged
 func ListPurgeSpaces(
-	spaces []cfclient.Space,
-	apps []cfclient.App,
-	instances []cfclient.ServiceInstance,
+	spaces []*resource.Space,
+	apps []*resource.App,
+	instances []*resource.ServiceInstance,
 	now time.Time,
 	notifyThreshold int,
 	purgeThreshold int,
@@ -235,27 +284,29 @@ func ListPurgeSpaces(
 	return
 }
 
-func groupAppsBySpace(apps []cfclient.App) map[string][]cfclient.App {
-	grouped := map[string][]cfclient.App{}
+func groupAppsBySpace(apps []*resource.App) map[string][]*resource.App {
+	grouped := map[string][]*resource.App{}
 
 	for _, app := range apps {
-		if _, ok := grouped[app.SpaceGuid]; !ok {
-			grouped[app.SpaceGuid] = []cfclient.App{}
+		spaceGuid := app.Relationships.Space.Data.GUID
+		if _, ok := grouped[spaceGuid]; !ok {
+			grouped[spaceGuid] = []*resource.App{}
 		}
-		grouped[app.SpaceGuid] = append(grouped[app.SpaceGuid], app)
+		grouped[spaceGuid] = append(grouped[spaceGuid], app)
 	}
 
 	return grouped
 }
 
-func groupInstancesBySpace(instances []cfclient.ServiceInstance) map[string][]cfclient.ServiceInstance {
-	grouped := map[string][]cfclient.ServiceInstance{}
+func groupInstancesBySpace(instances []*resource.ServiceInstance) map[string][]*resource.ServiceInstance {
+	grouped := map[string][]*resource.ServiceInstance{}
 
 	for _, instance := range instances {
-		if _, ok := grouped[instance.SpaceGuid]; !ok {
-			grouped[instance.SpaceGuid] = []cfclient.ServiceInstance{}
+		spaceGuid := instance.Relationships.Space.Data.GUID
+		if _, ok := grouped[spaceGuid]; !ok {
+			grouped[spaceGuid] = []*resource.ServiceInstance{}
 		}
-		grouped[instance.SpaceGuid] = append(grouped[instance.SpaceGuid], instance)
+		grouped[spaceGuid] = append(grouped[spaceGuid], instance)
 	}
 
 	return grouped

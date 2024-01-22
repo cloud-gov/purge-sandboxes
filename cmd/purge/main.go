@@ -1,37 +1,43 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"html/template"
 	"log"
 	"strings"
 	"time"
 
-	"github.com/cloudfoundry-community/go-cfclient"
-	"github.com/kelseyhightower/envconfig"
+	"github.com/cloudfoundry-community/go-cfclient/v3/client"
+	"github.com/cloudfoundry-community/go-cfclient/v3/config"
+	"github.com/cloudfoundry-community/go-cfclient/v3/resource"
+
+	"github.com/sethvargo/go-envconfig"
 
 	"github.com/18f/cg-sandbox/sandbox"
 )
 
 // Options describes common configuration
 type Options struct {
-	APIAddress        string `envconfig:"api_address" required:"true"`
-	ClientID          string `envconfig:"client_id" required:"true"`
-	ClientSecret      string `envconfig:"client_secret" required:"true"`
-	OrgPrefix         string `envconfig:"org_prefix" required:"true"`
-	NotifyDays        int    `envconfig:"notify_days" default:"25"`
-	PurgeDays         int    `envconfig:"purge_days" default:"30"`
-	MailSender        string `envconfig:"mail_sender" required:"true"`
-	NotifyMailSubject string `envconfig:"notify_mail_subject" required:"true"`
-	PurgeMailSubject  string `envconfig:"purge_mail_subject" required:"true"`
-	DryRun            bool   `envconfig:"dry_run" default:"true"`
-	TimeStartsAt      string `envconfig:"time_starts_at"`
+	APIAddress        string `env:"API_ADDRESS, required"`
+	ClientID          string `env:"CLIENT_ID, required"`
+	ClientSecret      string `env:"CLIENT_SECRET, required"`
+	OrgPrefix         string `env:"ORG_PREFIX, required"`
+	NotifyDays        int    `env:"NOTIFY_DAYS, default=25"`
+	PurgeDays         int    `env:"PURGE_DAYS, default=30"`
+	MailSender        string `env:"MAIL_SENDER, required"`
+	NotifyMailSubject string `env:"NOTIFY_MAIL_SUBJECT, required"`
+	PurgeMailSubject  string `env:"PURGE_MAIL_SUBJECT, required"`
+	DryRun            bool   `env:"DRY_RUN, default=true"`
+	TimeStartsAt      string `env:"TIME_STARTS_AT"`
 	sandbox.SMTPOptions
 }
 
 func main() {
 	var opts Options
-	if err := envconfig.Process("", &opts); err != nil {
+	ctx := context.Background()
+
+	if err := envconfig.Process(ctx, &opts); err != nil {
 		log.Fatalf("error parsing options: %s", err.Error())
 	}
 
@@ -45,29 +51,33 @@ func main() {
 		log.Fatalf("error reading purge template: %s", err.Error())
 	}
 
-	client, err := cfclient.NewClient(&cfclient.Config{
-		ApiAddress:   opts.APIAddress,
-		ClientID:     opts.ClientID,
-		ClientSecret: opts.ClientSecret,
-	})
+	cfg, err := config.NewClientSecret(
+		opts.APIAddress,
+		opts.ClientID,
+		opts.ClientSecret,
+	)
+	if err != nil {
+		log.Fatalf("error creating client: %s", err.Error())
+	}
+	cfClient, err := client.New(cfg)
 	if err != nil {
 		log.Fatalf("error creating client: %s", err.Error())
 	}
 
-	orgs, err := sandbox.ListSandboxOrgs(client, opts.OrgPrefix)
+	orgs, err := sandbox.ListSandboxOrgs(ctx, cfClient, opts.OrgPrefix)
 	if err != nil {
 		log.Fatalf("error getting orgs: %s", err.Error())
 	}
 
 	// Build filter of users with email addresses (not service accounts)
-	users, err := client.ListUsers()
+	users, err := cfClient.Users.ListAll(ctx, nil)
 	if err != nil {
 		log.Fatalf("error getting users: %s", err.Error())
 	}
 	userGUIDs := map[string]bool{}
 	for _, user := range users {
 		if strings.Contains(user.Username, "@") {
-			userGUIDs[user.Guid] = true
+			userGUIDs[user.GUID] = true
 		}
 	}
 
@@ -84,7 +94,7 @@ func main() {
 	var purgeErrors []string
 
 	for _, org := range orgs {
-		spaces, apps, instances, err := sandbox.ListOrgResources(client, org)
+		spaces, apps, instances, err := sandbox.ListOrgResources(ctx, cfClient, org)
 		if err != nil {
 			log.Fatalf("error listing org resources for org %s: %s", org.Name, err.Error())
 		}
@@ -94,16 +104,24 @@ func main() {
 			log.Fatalf("error listing spaces to purge for org %s: %s", org.Name, err.Error())
 		}
 
+		var (
+			spaceUsers []*resource.User
+			spaceRoles []*resource.Role
+			recipients []string
+		)
+
 		log.Printf("notifying %d spaces in org %s", len(toNotify), org.Name)
 		for _, details := range toNotify {
-			roles, err := details.Space.Roles()
+			spaceUsers, err = cfClient.Spaces.ListUsersAll(ctx, details.Space.GUID, nil)
 			if err != nil {
 				log.Fatalf("error listing roles on space %s: %s", details.Space.Name, err.Error())
 			}
-			recipients, _, _ := sandbox.ListRecipients(userGUIDs, roles)
+
+			recipients, err = sandbox.ListRecipients(userGUIDs, spaceUsers)
 			if err != nil {
 				log.Fatalf("error listing recipients on space %s: %s", details.Space.Name, err.Error())
 			}
+
 			log.Printf("Notifying space %s; recipients %+v", details.Space.Name, recipients)
 			if !opts.DryRun {
 				data := map[string]interface{}{
@@ -125,11 +143,17 @@ func main() {
 
 		log.Printf("purging %d spaces in org %s", len(toPurge), org.Name)
 		for _, details := range toPurge {
-			roles, err := details.Space.Roles()
+			spaceRoles, err = cfClient.Roles.ListAll(ctx, &client.RoleListOptions{
+				SpaceGUIDs: client.Filter{
+					Values: []string{details.Space.GUID},
+				},
+				Include: resource.RoleIncludeUser,
+			})
 			if err != nil {
 				log.Fatalf("error listing roles on space %s: %s", details.Space.Name, err.Error())
 			}
-			recipients, developers, managers := sandbox.ListRecipients(userGUIDs, roles)
+
+			developers, managers := sandbox.ListSpaceDevsAndManagers(userGUIDs, spaceRoles)
 			log.Printf("Purging space %s; recipients %+v", details.Space.Name, recipients)
 			if !opts.DryRun {
 				data := map[string]interface{}{
@@ -146,21 +170,23 @@ func main() {
 					log.Fatalf("error sending mail on space %s: %s", details.Space.Name, err.Error())
 				}
 				log.Printf("deleting and recreating space %s", details.Space.Name)
-				if err := sandbox.PurgeSpace(client, details.Space); err != nil {
+				if err := sandbox.PurgeSpace(ctx, cfClient, details.Space); err != nil {
 					purgeErrors = append(purgeErrors, fmt.Sprintf("error purging space %s in org %s: %s", details.Space.Name, org.Name, err.Error()))
 					break
 				}
 				if len(developers) > 0 || len(managers) > 0 {
-					spaceRequest := cfclient.SpaceRequest{
-						Name:              details.Space.Name,
-						OrganizationGuid:  details.Space.OrganizationGuid,
-						SpaceQuotaDefGuid: details.Space.QuotaDefinitionGuid,
-						DeveloperGuid:     developers,
-						ManagerGuid:       managers,
+					spaceRequest := &resource.SpaceCreate{
+						Name:          details.Space.Name,
+						Relationships: details.Space.Relationships,
 					}
 					log.Printf("recreating space: %+v", spaceRequest)
-					if _, err := client.CreateSpace(spaceRequest); err != nil {
+					if _, err := cfClient.Spaces.Create(ctx, &resource.SpaceCreate{}); err != nil {
 						purgeErrors = append(purgeErrors, fmt.Sprintf("error recreating space %s in org %s: %s", details.Space.Name, org.Name, err.Error()))
+						break
+					}
+					log.Printf("recreating space roles")
+					if err := sandbox.RecreateSpaceDevsAndManagers(ctx, cfClient, details.Space.GUID, developers, managers); err != nil {
+						purgeErrors = append(purgeErrors, fmt.Sprintf("error recreating space developers/managers for space %s in org %s: %s", details.Space.Name, org.Name, err.Error()))
 						break
 					}
 				}

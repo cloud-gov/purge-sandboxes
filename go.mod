@@ -1,21 +1,27 @@
 module github.com/18f/cg-sandbox
 
-go 1.13
+go 1.20
 
 require (
-	github.com/cloudfoundry-community/go-cfclient v0.0.0-20180404210329-cfc053bbd960
-	github.com/cloudfoundry/gofileutils v0.0.0-20170111115228-4d0c80011a0f
-	github.com/golang/protobuf v1.0.0
-	github.com/kelseyhightower/envconfig v1.3.0
-	github.com/onsi/ginkgo v1.4.0
-	github.com/onsi/gomega v1.3.0
-	github.com/pkg/errors v0.8.0
-	golang.org/x/net v0.0.0-20180404174746-b3c676e531a6
-	golang.org/x/oauth2 v0.0.0-20180402223937-921ae394b943
-	golang.org/x/sys v0.0.0-20180404203733-1d206c9fa897
-	golang.org/x/text v0.3.0
-	google.golang.org/appengine v1.0.0
-	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc
+	github.com/cloudfoundry-community/go-cfclient/v3 v3.0.0-alpha.6
+	github.com/google/go-cmp v0.6.0
+	github.com/sethvargo/go-envconfig v1.0.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
-	gopkg.in/yaml.v2 v2.2.1
+)
+
+require (
+	github.com/codegangsta/inject v0.0.0-20150114235600-33e0aa1cb7c0 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/go-martini/martini v0.0.0-20170121215854-22fa46961aab // indirect
+	github.com/golang/protobuf v1.5.3 // indirect
+	github.com/martini-contrib/render v0.0.0-20150707142108-ec18f8345a11 // indirect
+	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/stretchr/testify v1.8.4 // indirect
+	golang.org/x/net v0.20.0 // indirect
+	golang.org/x/oauth2 v0.16.0 // indirect
+	google.golang.org/appengine v1.6.8 // indirect
+	google.golang.org/protobuf v1.32.0 // indirect
+	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
