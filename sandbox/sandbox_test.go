@@ -149,81 +149,35 @@ func TestListSpaceDevsAndManagers(t *testing.T) {
 	}
 }
 
-var _ = Describe("Sandbox", func() {
-
-	Describe("ListSpaceDevsAndManagers", func() {
-		var (
-			userGUIDs map[string]bool
-			roles     []*resource.Role
-		)
-
-		It("skips users not in guids map", func() {
-			userGUIDs = map[string]bool{
-				"user-1": true,
-				"user-2": true,
-			}
-			roles = []*resource.Role{
-				{
-					Type: "space_developer",
-					Relationships: resource.RoleSpaceUserOrganizationRelationships{
-						User: resource.ToOneRelationship{
-							Data: &resource.Relationship{
-								GUID: "user-1",
-							},
-						},
-					},
-				},
-				{
-					Type: "space_manager",
-					Relationships: resource.RoleSpaceUserOrganizationRelationships{
-						User: resource.ToOneRelationship{
-							Data: &resource.Relationship{
-								GUID: "user-1",
-							},
-						},
-					},
-				},
-				{
-					Type: "space_developer",
-					Relationships: resource.RoleSpaceUserOrganizationRelationships{
-						User: resource.ToOneRelationship{
-							Data: &resource.Relationship{
-								GUID: "user-2",
-							},
-						},
-					},
-				},
-			}
-			developers, managers := sandbox.ListSpaceDevsAndManagers(userGUIDs, roles)
-			Expect(developers).To(Equal([]string{"user-1", "user-2"}))
-			Expect(managers).To(Equal([]string{"user-1"}))
-		})
-	})
-
-	Describe("ListPurgeSpaces", func() {
-		var (
-			spaces    []*resource.Space
-			apps      []*resource.App
-			instances []*resource.ServiceInstance
-			now       time.Time
-		)
-
-		BeforeEach(func() {
-			spaces = []*resource.Space{
+func TestListPurgeSpaces(t *testing.T) {
+	now := time.Now()
+	testCases := map[string]struct {
+		spaces           []*resource.Space
+		apps             []*resource.App
+		instances        []*resource.ServiceInstance
+		now              time.Time
+		expectedToNotify []sandbox.SpaceDetails
+		expectedToPurge  []sandbox.SpaceDetails
+		notifyThreshold  int
+		purgeThreshold   int
+		expectedErr      string
+		timeStartsAt     time.Time
+	}{
+		"skips empty spaces": {
+			spaces: []*resource.Space{
 				{GUID: "space-guid"},
-			}
-			now = time.Now().Truncate(24 * time.Hour)
-		})
-
-		It("skips empty spaces", func() {
-			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(toNotify).To(HaveLen(0))
-			Expect(toPurge).To(HaveLen(0))
-		})
-
-		It("skips spaces with recent resources", func() {
-			apps = []*resource.App{
+			},
+			now:             now.Truncate(24 * time.Hour),
+			notifyThreshold: 25,
+			purgeThreshold:  30,
+			timeStartsAt:    time.Time{},
+		},
+		"skips spaces with recent resources": {
+			spaces: []*resource.Space{
+				{GUID: "space-guid"},
+			},
+			now: now.Truncate(24 * time.Hour),
+			apps: []*resource.App{
 				{
 					GUID: "app-guid",
 					Relationships: resource.SpaceRelationship{
@@ -235,15 +189,17 @@ var _ = Describe("Sandbox", func() {
 					},
 					CreatedAt: now.Add(-15 * 24 * time.Hour),
 				},
-			}
-			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(toNotify).To(HaveLen(0))
-			Expect(toPurge).To(HaveLen(0))
-		})
-
-		It("notifies on spaces between thresholds", func() {
-			apps = []*resource.App{
+			},
+			notifyThreshold: 25,
+			purgeThreshold:  30,
+			timeStartsAt:    time.Time{},
+		},
+		"notifies on spaces between thresholds": {
+			spaces: []*resource.Space{
+				{GUID: "space-guid"},
+			},
+			now: now.Truncate(24 * time.Hour),
+			apps: []*resource.App{
 				{
 					GUID: "app-guid",
 					Relationships: resource.SpaceRelationship{
@@ -255,15 +211,25 @@ var _ = Describe("Sandbox", func() {
 					},
 					CreatedAt: now.Add(-28 * 24 * time.Hour),
 				},
-			}
-			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(toNotify).To(HaveLen(1))
-			Expect(toPurge).To(HaveLen(0))
-		})
-
-		It("notifies on the notify threshold", func() {
-			apps = []*resource.App{
+			},
+			notifyThreshold: 25,
+			purgeThreshold:  30,
+			timeStartsAt:    time.Time{},
+			expectedToNotify: []sandbox.SpaceDetails{
+				{
+					Timestamp: now.Add(-28 * 24 * time.Hour).Truncate(24 * time.Hour),
+					Space: &resource.Space{
+						GUID: "space-guid",
+					},
+				},
+			},
+		},
+		"notifies on the notify threshold": {
+			spaces: []*resource.Space{
+				{GUID: "space-guid"},
+			},
+			now: now.Truncate(24 * time.Hour),
+			apps: []*resource.App{
 				{
 					GUID: "app-guid",
 					Relationships: resource.SpaceRelationship{
@@ -275,15 +241,25 @@ var _ = Describe("Sandbox", func() {
 					},
 					CreatedAt: now.Add(-25 * 24 * time.Hour),
 				},
-			}
-			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(toNotify).To(HaveLen(1))
-			Expect(toPurge).To(HaveLen(0))
-		})
-
-		It("purges on the purge threshold", func() {
-			apps = []*resource.App{
+			},
+			notifyThreshold: 25,
+			purgeThreshold:  30,
+			timeStartsAt:    time.Time{},
+			expectedToNotify: []sandbox.SpaceDetails{
+				{
+					Timestamp: now.Add(-25 * 24 * time.Hour).Truncate(24 * time.Hour),
+					Space: &resource.Space{
+						GUID: "space-guid",
+					},
+				},
+			},
+		},
+		"purges on the purge threshold": {
+			spaces: []*resource.Space{
+				{GUID: "space-guid"},
+			},
+			now: now.Truncate(24 * time.Hour),
+			apps: []*resource.App{
 				{
 					GUID: "app-guid",
 					Relationships: resource.SpaceRelationship{
@@ -295,15 +271,25 @@ var _ = Describe("Sandbox", func() {
 					},
 					CreatedAt: now.Add(-30 * 24 * time.Hour),
 				},
-			}
-			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(toNotify).To(HaveLen(0))
-			Expect(toPurge).To(HaveLen(1))
-		})
-
-		It("purges after the purge threshold", func() {
-			apps = []*resource.App{
+			},
+			notifyThreshold: 25,
+			purgeThreshold:  30,
+			timeStartsAt:    time.Time{},
+			expectedToPurge: []sandbox.SpaceDetails{
+				{
+					Timestamp: now.Add(-30 * 24 * time.Hour).Truncate(24 * time.Hour),
+					Space: &resource.Space{
+						GUID: "space-guid",
+					},
+				},
+			},
+		},
+		"purges after the purge threshold": {
+			spaces: []*resource.Space{
+				{GUID: "space-guid"},
+			},
+			now: now.Truncate(24 * time.Hour),
+			apps: []*resource.App{
 				{
 					GUID: "app-guid",
 					Relationships: resource.SpaceRelationship{
@@ -315,15 +301,25 @@ var _ = Describe("Sandbox", func() {
 					},
 					CreatedAt: now.Add(-31 * 24 * time.Hour),
 				},
-			}
-			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, time.Time{})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(toNotify).To(HaveLen(0))
-			Expect(toPurge).To(HaveLen(1))
-		})
-
-		It("purges after the purge threshold when time starts in the past", func() {
-			apps = []*resource.App{
+			},
+			notifyThreshold: 25,
+			purgeThreshold:  30,
+			timeStartsAt:    time.Time{},
+			expectedToPurge: []sandbox.SpaceDetails{
+				{
+					Timestamp: now.Add(-31 * 24 * time.Hour).Truncate(24 * time.Hour),
+					Space: &resource.Space{
+						GUID: "space-guid",
+					},
+				},
+			},
+		},
+		"purges after the purge threshold when time starts in the past": {
+			spaces: []*resource.Space{
+				{GUID: "space-guid"},
+			},
+			now: now.Truncate(24 * time.Hour),
+			apps: []*resource.App{
 				{
 					GUID: "app-guid",
 					Relationships: resource.SpaceRelationship{
@@ -335,15 +331,25 @@ var _ = Describe("Sandbox", func() {
 					},
 					CreatedAt: now.Add(-31 * 24 * time.Hour),
 				},
-			}
-			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, now.Add(-60*24*time.Hour))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(toNotify).To(HaveLen(0))
-			Expect(toPurge).To(HaveLen(1))
-		})
-
-		It("skips purge when time starts after last timestamp", func() {
-			apps = []*resource.App{
+			},
+			notifyThreshold: 25,
+			purgeThreshold:  30,
+			timeStartsAt:    now.Add(-60 * 24 * time.Hour),
+			expectedToPurge: []sandbox.SpaceDetails{
+				{
+					Timestamp: now.Add(-31 * 24 * time.Hour).Truncate(24 * time.Hour),
+					Space: &resource.Space{
+						GUID: "space-guid",
+					},
+				},
+			},
+		},
+		"skips purge when time starts after last timestamp": {
+			spaces: []*resource.Space{
+				{GUID: "space-guid"},
+			},
+			now: now.Truncate(24 * time.Hour),
+			apps: []*resource.App{
 				{
 					GUID: "app-guid",
 					Relationships: resource.SpaceRelationship{
@@ -355,14 +361,37 @@ var _ = Describe("Sandbox", func() {
 					},
 					CreatedAt: now.Add(-31 * 24 * time.Hour),
 				},
+			},
+			notifyThreshold: 25,
+			purgeThreshold:  30,
+			timeStartsAt:    now,
+		},
+	}
+	for name, test := range testCases {
+		t.Run(name, func(t *testing.T) {
+			toNotify, toPurge, err := sandbox.ListPurgeSpaces(
+				test.spaces,
+				test.apps,
+				test.instances,
+				test.now,
+				test.notifyThreshold,
+				test.purgeThreshold,
+				test.timeStartsAt,
+			)
+			if (test.expectedErr == "" && err != nil) || (test.expectedErr != "" && test.expectedErr != err.Error()) {
+				t.Fatalf("expected error: %s, got: %s", test.expectedErr, err)
 			}
-			toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, 25, 30, now)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(toNotify).To(HaveLen(0))
-			Expect(toPurge).To(HaveLen(0))
+			if diff := cmp.Diff(test.expectedToNotify, toNotify); diff != "" {
+				t.Errorf("ListPurgeSpaces() mismatch toNotify (-want +got):\n%s", diff)
+			}
+			if diff := cmp.Diff(test.expectedToPurge, toPurge); diff != "" {
+				t.Errorf("ListPurgeSpaces() mismatch toPurge (-want +got):\n%s", diff)
+			}
 		})
-	})
+	}
+}
 
+var _ = Describe("Sandbox", func() {
 	Describe("GetFirstResource", func() {
 		var (
 			space     *resource.Space
