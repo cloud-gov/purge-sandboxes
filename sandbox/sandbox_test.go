@@ -391,29 +391,25 @@ func TestListPurgeSpaces(t *testing.T) {
 	}
 }
 
-var _ = Describe("Sandbox", func() {
-	Describe("GetFirstResource", func() {
-		var (
-			space     *resource.Space
-			apps      []*resource.App
-			instances []*resource.ServiceInstance
-		)
-
-		BeforeEach(func() {
-			space = &resource.Space{
+func TestGetFirstResource(t *testing.T) {
+	now := time.Now()
+	testCases := map[string]struct {
+		space                 *resource.Space
+		apps                  []*resource.App
+		instances             []*resource.ServiceInstance
+		expectedFirstResource time.Time
+		expectedErr           string
+	}{
+		"skips empty spaces": {
+			space: &resource.Space{
 				GUID: "space-guid",
-			}
-		})
-
-		It("returns the zero value for an empty space", func() {
-			firstResource, err := sandbox.GetFirstResource(space, apps, instances)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(firstResource.IsZero()).To(BeTrue())
-		})
-
-		It("returns the timestamp of the earliest app", func() {
-			now := time.Now()
-			apps = []*resource.App{
+			},
+		},
+		"returns the timestamp of the earliest app": {
+			space: &resource.Space{
+				GUID: "space-guid",
+			},
+			apps: []*resource.App{
 				{
 					GUID: "app-guid",
 					Relationships: resource.SpaceRelationship{
@@ -425,8 +421,8 @@ var _ = Describe("Sandbox", func() {
 					},
 					CreatedAt: now.Add(-10 * 24 * time.Hour),
 				},
-			}
-			instances = []*resource.ServiceInstance{
+			},
+			instances: []*resource.ServiceInstance{
 				{
 					GUID: "instance-guid",
 					Relationships: resource.ServiceInstanceRelationships{
@@ -438,15 +434,14 @@ var _ = Describe("Sandbox", func() {
 					},
 					CreatedAt: now.Add(-5 * 24 * time.Hour),
 				},
-			}
-			firstResource, err := sandbox.GetFirstResource(space, apps, instances)
-			Expect(err).NotTo(HaveOccurred())
-			firstResource.Equal(now.Add(-10 * 24 * time.Hour))
-		})
-
-		It("returns the timestamp of the earliest instance", func() {
-			now := time.Now()
-			apps = []*resource.App{
+			},
+			expectedFirstResource: now.Add(-10 * 24 * time.Hour),
+		},
+		"returns the timestamp of the earliest instance": {
+			space: &resource.Space{
+				GUID: "space-guid",
+			},
+			apps: []*resource.App{
 				{
 					GUID: "app-guid",
 					Relationships: resource.SpaceRelationship{
@@ -458,8 +453,8 @@ var _ = Describe("Sandbox", func() {
 					},
 					CreatedAt: now.Add(-5 * 24 * time.Hour),
 				},
-			}
-			instances = []*resource.ServiceInstance{
+			},
+			instances: []*resource.ServiceInstance{
 				{
 					GUID: "instance-guid",
 					Relationships: resource.ServiceInstanceRelationships{
@@ -471,12 +466,28 @@ var _ = Describe("Sandbox", func() {
 					},
 					CreatedAt: now.Add(-10 * 24 * time.Hour),
 				},
+			},
+			expectedFirstResource: now.Add(-10 * 24 * time.Hour),
+		},
+	}
+	for name, test := range testCases {
+		t.Run(name, func(t *testing.T) {
+			firstResource, err := sandbox.GetFirstResource(
+				test.space,
+				test.apps,
+				test.instances,
+			)
+			if (test.expectedErr == "" && err != nil) || (test.expectedErr != "" && test.expectedErr != err.Error()) {
+				t.Fatalf("expected error: %s, got: %s", test.expectedErr, err)
 			}
-			firstResource, err := sandbox.GetFirstResource(space, apps, instances)
-			Expect(err).NotTo(HaveOccurred())
-			firstResource.Equal(now.Add(-10 * 24 * time.Hour))
+			if !cmp.Equal(test.expectedFirstResource, firstResource) {
+				t.Errorf("GetFirstResource() expected: %s, got: %s", test.expectedFirstResource, firstResource)
+			}
 		})
-	})
+	}
+}
+
+var _ = Describe("Sandbox", func() {
 	Describe("RenderTemplate", func() {
 		var (
 			tpl              *template.Template
