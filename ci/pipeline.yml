@@ -5,7 +5,7 @@ jobs:
   - in_parallel:
     - get: sandbox-source
       trigger: true
-  - set_pipeline: self
+  - set_pipeline: purge-sandboxes
     file: sandbox-source/ci/pipeline.yml
 
 - name: test
