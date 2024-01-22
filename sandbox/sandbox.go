@@ -224,19 +224,11 @@ func GetFirstResource(
 
 	var firstResource time.Time
 	for _, app := range groupedApps[space.GUID] {
-		// createdAt, err := time.Parse(time.RFC3339Nano, app.CreatedAt.Format())
-		// if err != nil {
-		// 	return firstResource, err
-		// }
 		if firstResource.IsZero() || app.CreatedAt.Before(firstResource) {
 			firstResource = app.CreatedAt
 		}
 	}
 	for _, instance := range groupedInstances[space.GUID] {
-		// createdAt, err := time.Parse(time.RFC3339Nano, instance.CreatedAt.String())
-		// if err != nil {
-		// 	return firstResource, err
-		// }
 		if firstResource.IsZero() || instance.CreatedAt.Before(firstResource) {
 			firstResource = instance.CreatedAt
 		}
