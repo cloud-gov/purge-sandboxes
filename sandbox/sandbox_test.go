@@ -4,16 +4,49 @@ import (
 	"html/template"
 	"io/ioutil"
 	"os"
+	"testing"
 	"time"
 
-	"github.com/cloudfoundry-community/go-cfclient"
 	"github.com/cloudfoundry-community/go-cfclient/v3/resource"
+	"github.com/google/go-cmp/cmp"
 
 	"github.com/18f/cg-sandbox/sandbox"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 )
+
+func TestListRecipients(t *testing.T) {
+	testCases := map[string]struct {
+		userGUIDs          map[string]bool
+		users              []*resource.User
+		expectedRecipients []string
+	}{
+		"skips users not in GUIDs map": {
+			userGUIDs: map[string]bool{
+				"user-1": true,
+				"user-2": true,
+			},
+			users: []*resource.User{
+				{GUID: "user-1", Username: "foo1@bar.gov"},
+				{GUID: "user-2", Username: "foo2@bar.gov"},
+				{GUID: "user-3", Username: "foo3@bar.gov"},
+			},
+			expectedRecipients: []string{"foo1@bar.gov", "foo2@bar.gov"},
+		},
+	}
+	for name, test := range testCases {
+		t.Run(name, func(t *testing.T) {
+			recipients, err := sandbox.ListRecipients(test.userGUIDs, test.users)
+			if err != nil {
+				t.Fatalf("unexpected error: %s", err)
+			}
+			if diff := cmp.Diff(test.expectedRecipients, recipients); diff != "" {
+				t.Errorf("ListRecipients() mismatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
 
 var _ = Describe("Sandbox", func() {
 	Describe("ListRecipients", func() {
@@ -263,14 +296,14 @@ var _ = Describe("Sandbox", func() {
 
 	Describe("GetFirstResource", func() {
 		var (
-			space     cfclient.Space
-			apps      []cfclient.App
-			instances []cfclient.ServiceInstance
+			space     *resource.Space
+			apps      []*resource.App
+			instances []*resource.ServiceInstance
 		)
 
 		BeforeEach(func() {
-			space = cfclient.Space{
-				Guid: "space-guid",
+			space = &resource.Space{
+				GUID: "space-guid",
 			}
 		})
 
@@ -282,18 +315,30 @@ var _ = Describe("Sandbox", func() {
 
 		It("returns the timestamp of the earliest app", func() {
 			now := time.Now()
-			apps = []cfclient.App{
+			apps = []*resource.App{
 				{
-					Guid:      "app-guid",
-					SpaceGuid: "space-guid",
-					CreatedAt: now.Add(-10 * 24 * time.Hour).Format(time.RFC3339Nano),
+					GUID: "app-guid",
+					Relationships: resource.SpaceRelationship{
+						Space: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-10 * 24 * time.Hour),
 				},
 			}
-			instances = []cfclient.ServiceInstance{
+			instances = []*resource.ServiceInstance{
 				{
-					Guid:      "instance-guid",
-					SpaceGuid: "space-guid",
-					CreatedAt: now.Add(-5 * 24 * time.Hour).Format(time.RFC3339Nano),
+					GUID: "instance-guid",
+					Relationships: resource.ServiceInstanceRelationships{
+						Space: &resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-5 * 24 * time.Hour),
 				},
 			}
 			firstResource, err := sandbox.GetFirstResource(space, apps, instances)
@@ -303,18 +348,30 @@ var _ = Describe("Sandbox", func() {
 
 		It("returns the timestamp of the earliest instance", func() {
 			now := time.Now()
-			apps = []cfclient.App{
+			apps = []*resource.App{
 				{
-					Guid:      "app-guid",
-					SpaceGuid: "space-guid",
-					CreatedAt: now.Add(-5 * 24 * time.Hour).Format(time.RFC3339Nano),
+					GUID: "app-guid",
+					Relationships: resource.SpaceRelationship{
+						Space: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-5 * 24 * time.Hour),
 				},
 			}
-			instances = []cfclient.ServiceInstance{
+			instances = []*resource.ServiceInstance{
 				{
-					Guid:      "instance-guid",
-					SpaceGuid: "space-guid",
-					CreatedAt: now.Add(-10 * 24 * time.Hour).Format(time.RFC3339Nano),
+					GUID: "instance-guid",
+					Relationships: resource.ServiceInstanceRelationships{
+						Space: &resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-10 * 24 * time.Hour),
 				},
 			}
 			firstResource, err := sandbox.GetFirstResource(space, apps, instances)
@@ -333,10 +390,10 @@ var _ = Describe("Sandbox", func() {
 			BeforeEach(func() {
 				tpl, err = template.ParseFiles("../templates/base.html", "../templates/notify.tmpl")
 				data = map[string]interface{}{
-					"org": cfclient.Org{
+					"org": &resource.Organization{
 						Name: "test-org",
 					},
-					"space": cfclient.Space{
+					"space": &resource.Space{
 						Name: "test-space",
 					},
 					"date": time.Date(2009, 11, 17, 20, 34, 58, 651387237, time.UTC),
@@ -361,10 +418,10 @@ var _ = Describe("Sandbox", func() {
 			BeforeEach(func() {
 				tpl, err = template.ParseFiles("../templates/base.html", "../templates/purge.tmpl")
 				data = map[string]interface{}{
-					"org": cfclient.Org{
+					"org": &resource.Organization{
 						Name: "test-org",
 					},
-					"space": cfclient.Space{
+					"space": &resource.Space{
 						Name: "test-space",
 					},
 					"date": time.Date(2009, 11, 17, 20, 34, 58, 651387237, time.UTC),
