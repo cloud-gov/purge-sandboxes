@@ -64,13 +64,13 @@ func main() {
 		log.Fatalf("error creating client: %s", err.Error())
 	}
 
-	orgs, err := sandbox.ListSandboxOrgs(cfClient, opts.OrgPrefix)
+	orgs, err := sandbox.ListSandboxOrgs(ctx, cfClient, opts.OrgPrefix)
 	if err != nil {
 		log.Fatalf("error getting orgs: %s", err.Error())
 	}
 
 	// Build filter of users with email addresses (not service accounts)
-	users, err := cfClient.Users.ListAll(context.Background(), nil)
+	users, err := cfClient.Users.ListAll(ctx, nil)
 	if err != nil {
 		log.Fatalf("error getting users: %s", err.Error())
 	}
@@ -94,7 +94,7 @@ func main() {
 	var purgeErrors []string
 
 	for _, org := range orgs {
-		spaces, apps, instances, err := sandbox.ListOrgResources(cfClient, org)
+		spaces, apps, instances, err := sandbox.ListOrgResources(ctx, cfClient, org)
 		if err != nil {
 			log.Fatalf("error listing org resources for org %s: %s", org.Name, err.Error())
 		}
@@ -112,7 +112,7 @@ func main() {
 
 		log.Printf("notifying %d spaces in org %s", len(toNotify), org.Name)
 		for _, details := range toNotify {
-			spaceUsers, err = cfClient.Spaces.ListUsersAll(context.Background(), details.Space.GUID, nil)
+			spaceUsers, err = cfClient.Spaces.ListUsersAll(ctx, details.Space.GUID, nil)
 			if err != nil {
 				log.Fatalf("error listing roles on space %s: %s", details.Space.Name, err.Error())
 			}
@@ -143,7 +143,7 @@ func main() {
 
 		log.Printf("purging %d spaces in org %s", len(toPurge), org.Name)
 		for _, details := range toPurge {
-			spaceRoles, err = cfClient.Roles.ListAll(context.Background(), &client.RoleListOptions{
+			spaceRoles, err = cfClient.Roles.ListAll(ctx, &client.RoleListOptions{
 				SpaceGUIDs: client.Filter{
 					Values: []string{details.Space.GUID},
 				},
@@ -180,12 +180,12 @@ func main() {
 						Relationships: details.Space.Relationships,
 					}
 					log.Printf("recreating space: %+v", spaceRequest)
-					if _, err := cfClient.Spaces.Create(context.Background(), &resource.SpaceCreate{}); err != nil {
+					if _, err := cfClient.Spaces.Create(ctx, &resource.SpaceCreate{}); err != nil {
 						purgeErrors = append(purgeErrors, fmt.Sprintf("error recreating space %s in org %s: %s", details.Space.Name, org.Name, err.Error()))
 						break
 					}
 					log.Printf("recreating space roles")
-					if err := sandbox.RecreateSpaceDevsAndManagers(cfClient, details.Space.GUID, developers, managers); err != nil {
+					if err := sandbox.RecreateSpaceDevsAndManagers(ctx, cfClient, details.Space.GUID, developers, managers); err != nil {
 						purgeErrors = append(purgeErrors, fmt.Sprintf("error recreating space developers/managers for space %s in org %s: %s", details.Space.Name, org.Name, err.Error()))
 						break
 					}

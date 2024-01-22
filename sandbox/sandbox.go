@@ -64,6 +64,7 @@ func ListSpaceDevsAndManagers(
 }
 
 func RecreateSpaceDevsAndManagers(
+	ctx context.Context,
 	cfClient *client.Client,
 	spaceGUID string,
 	developers []string,
@@ -153,10 +154,14 @@ func SendMail(
 }
 
 // ListSandboxOrgs lists all sandbox organizations
-func ListSandboxOrgs(client *client.Client, prefix string) ([]*resource.Organization, error) {
+func ListSandboxOrgs(
+	ctx context.Context,
+	client *client.Client,
+	prefix string,
+) ([]*resource.Organization, error) {
 	sandboxes := []*resource.Organization{}
 
-	orgs, err := client.Organizations.ListAll(context.Background(), nil)
+	orgs, err := client.Organizations.ListAll(ctx, nil)
 	if err != nil {
 		return sandboxes, err
 	}
@@ -172,6 +177,7 @@ func ListSandboxOrgs(client *client.Client, prefix string) ([]*resource.Organiza
 
 // ListOrgResources fetches apps, service instances, and spaces within an organization
 func ListOrgResources(
+	ctx context.Context,
 	cfClient *client.Client,
 	org *resource.Organization,
 ) (
@@ -183,7 +189,7 @@ func ListOrgResources(
 	// query := url.Values(map[string][]string{"q": []string{"organization_guid:" + org.Guid}})
 
 	// apps, err = client.ListAppsByQuery(query)
-	apps, err = cfClient.Applications.ListAll(context.Background(), &client.AppListOptions{
+	apps, err = cfClient.Applications.ListAll(ctx, &client.AppListOptions{
 		OrganizationGUIDs: client.Filter{
 			Values: []string{org.GUID},
 		},
@@ -192,7 +198,7 @@ func ListOrgResources(
 		return
 	}
 
-	instances, err = cfClient.ServiceInstances.ListAll(context.Background(), &client.ServiceInstanceListOptions{
+	instances, err = cfClient.ServiceInstances.ListAll(ctx, &client.ServiceInstanceListOptions{
 		OrganizationGUIDs: client.Filter{
 			Values: []string{org.GUID},
 		},
@@ -201,7 +207,7 @@ func ListOrgResources(
 		return
 	}
 
-	spaces, err = cfClient.Spaces.ListAll(context.Background(), &client.SpaceListOptions{
+	spaces, err = cfClient.Spaces.ListAll(ctx, &client.SpaceListOptions{
 		OrganizationGUIDs: client.Filter{
 			Values: []string{org.GUID},
 		},
