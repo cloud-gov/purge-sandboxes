@@ -186,9 +186,6 @@ func ListOrgResources(
 	instances []*resource.ServiceInstance,
 	err error,
 ) {
-	// query := url.Values(map[string][]string{"q": []string{"organization_guid:" + org.Guid}})
-
-	// apps, err = client.ListAppsByQuery(query)
 	apps, err = cfClient.Applications.ListAll(ctx, &client.AppListOptions{
 		OrganizationGUIDs: client.Filter{
 			Values: []string{org.GUID},
