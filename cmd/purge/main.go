@@ -94,6 +94,7 @@ func main() {
 	var purgeErrors []string
 
 	for _, org := range orgs {
+		log.Printf("getting org resources for org %s", org.Name)
 		spaces, apps, instances, err := sandbox.ListOrgResources(ctx, cfClient, org)
 		if err != nil {
 			log.Fatalf("error listing org resources for org %s: %s", org.Name, err.Error())

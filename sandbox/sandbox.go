@@ -186,29 +186,23 @@ func ListOrgResources(
 	instances []*resource.ServiceInstance,
 	err error,
 ) {
-	apps, err = cfClient.Applications.ListAll(ctx, &client.AppListOptions{
-		OrganizationGUIDs: client.Filter{
-			Values: []string{org.GUID},
-		},
-	})
+	appListOptions := client.NewAppListOptions()
+	appListOptions.OrganizationGUIDs.EqualTo(org.GUID)
+	apps, err = cfClient.Applications.ListAll(ctx, appListOptions)
 	if err != nil {
 		return
 	}
 
-	instances, err = cfClient.ServiceInstances.ListAll(ctx, &client.ServiceInstanceListOptions{
-		OrganizationGUIDs: client.Filter{
-			Values: []string{org.GUID},
-		},
-	})
+	serviceListOptions := client.NewServiceInstanceListOptions()
+	serviceListOptions.OrganizationGUIDs.EqualTo(org.GUID)
+	instances, err = cfClient.ServiceInstances.ListAll(ctx, serviceListOptions)
 	if err != nil {
 		return
 	}
 
-	spaces, err = cfClient.Spaces.ListAll(ctx, &client.SpaceListOptions{
-		OrganizationGUIDs: client.Filter{
-			Values: []string{org.GUID},
-		},
-	})
+	spaceListOptions := client.NewSpaceListOptions()
+	spaceListOptions.OrganizationGUIDs.EqualTo(org.GUID)
+	spaces, err = cfClient.Spaces.ListAll(ctx, spaceListOptions)
 	if err != nil {
 		return
 	}
