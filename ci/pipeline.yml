@@ -119,11 +119,11 @@ resources:
     uri: https://github.com/cloud-gov/cg-sandbox
     branch: fix-panic
 
-- name: schedule
-  type: cron-resource
-  source:
-    expression: ((schedule-expression))
-    location: ((schedule-location))
+# - name: schedule
+#   type: cron-resource
+#   source:
+#     expression: ((schedule-expression))
+#     location: ((schedule-location))
 
 - name: slack
   type: slack-notification
