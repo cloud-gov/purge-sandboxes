@@ -24,8 +24,8 @@ jobs:
   - in_parallel:
     - get: sandbox-source
       passed: [test]
-    - get: schedule
-      trigger: true
+    # - get: schedule
+    #   trigger: true
     - get: general-task
       
   - task: purge
@@ -71,8 +71,8 @@ jobs:
   - in_parallel:
     - get: sandbox-source
       passed: [purge-sandboxes-staging]
-    - get: schedule
-      trigger: true
+    # - get: schedule
+    #   trigger: true
     - get: general-task
   - task: purge
     file: sandbox-source/ci/purge.yml
