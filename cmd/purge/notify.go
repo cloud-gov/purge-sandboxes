@@ -28,7 +28,7 @@ func notifySpaceUsers(
 		return fmt.Errorf("error listing users on space %s: %w", details.Space.Name, err)
 	}
 
-	recipients, err := ListRecipients(userGUIDs, spaceUsers)
+	recipients, err := listRecipients(userGUIDs, spaceUsers)
 	if err != nil {
 		return fmt.Errorf("error listing recipients on space %s: %w", details.Space.Name, err)
 	}

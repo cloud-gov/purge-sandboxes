@@ -10,8 +10,8 @@ import (
 	"github.com/cloudfoundry-community/go-cfclient/v3/resource"
 )
 
-// ListRecipients get a list of recipient emails from space users
-func ListRecipients(
+// listRecipients get a list of recipient emails from space users
+func listRecipients(
 	userGUIDs map[string]bool,
 	spaceUsers []*resource.User,
 ) (addresses []string, err error) {
@@ -29,7 +29,7 @@ func ListRecipients(
 	return addresses, nil
 }
 
-func ListSpaceDevsAndManagers(
+func listSpaceDevsAndManagers(
 	userGUIDs map[string]bool,
 	spaceRoles []*resource.Role,
 ) (developers []string, managers []string) {
@@ -49,7 +49,7 @@ func ListSpaceDevsAndManagers(
 	return
 }
 
-func RecreateSpaceDevsAndManagers(
+func recreateSpaceDevsAndManagers(
 	ctx context.Context,
 	cfClient *cfResourceClient,
 	spaceGUID string,
@@ -71,8 +71,8 @@ func RecreateSpaceDevsAndManagers(
 	return nil
 }
 
-// PurgeSpace deletes a space; if the delete fails, it deletes all applications within the space
-func PurgeSpace(
+// purgeSpace deletes a space; if the delete fails, it deletes all applications within the space
+func purgeSpace(
 	ctx context.Context,
 	cfClient *cfResourceClient,
 	space *resource.Space,
@@ -98,8 +98,8 @@ func PurgeSpace(
 	return nil
 }
 
-// ListSandboxOrgs lists all sandbox organizations
-func ListSandboxOrgs(
+// listSandboxOrgs lists all sandbox organizations
+func listSandboxOrgs(
 	ctx context.Context,
 	cfClient *cfResourceClient,
 	prefix string,
@@ -120,8 +120,8 @@ func ListSandboxOrgs(
 	return sandboxes, nil
 }
 
-// ListOrgResources fetches apps, service instances, and spaces within an organization
-func ListOrgResources(
+// listOrgResources fetches apps, service instances, and spaces within an organization
+func listOrgResources(
 	ctx context.Context,
 	cfClient *cfResourceClient,
 	org *resource.Organization,
@@ -155,8 +155,8 @@ func ListOrgResources(
 	return
 }
 
-// GetFirstResource gets the creation timestamp of the earliest-created resource in a space
-func GetFirstResource(
+// letFirstResource gets the creation timestamp of the earliest-created resource in a space
+func letFirstResource(
 	space *resource.Space,
 	apps []*resource.App,
 	instances []*resource.ServiceInstance,
@@ -185,8 +185,8 @@ type SpaceDetails struct {
 	Space     *resource.Space
 }
 
-// ListPurgeSpaces identifies spaces that will be notified or purged
-func ListPurgeSpaces(
+// listPurgeSpaces identifies spaces that will be notified or purged
+func listPurgeSpaces(
 	spaces []*resource.Space,
 	apps []*resource.App,
 	instances []*resource.ServiceInstance,
@@ -201,7 +201,7 @@ func ListPurgeSpaces(
 ) {
 	var firstResource time.Time
 	for _, space := range spaces {
-		firstResource, err = GetFirstResource(space, apps, instances)
+		firstResource, err = letFirstResource(space, apps, instances)
 		if err != nil {
 			return
 		}

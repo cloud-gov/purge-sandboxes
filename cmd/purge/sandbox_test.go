@@ -39,7 +39,7 @@ func TestListRecipients(t *testing.T) {
 	}
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
-			recipients, err := ListRecipients(test.userGUIDs, test.users)
+			recipients, err := listRecipients(test.userGUIDs, test.users)
 			if (test.expectedErr == "" && err != nil) || (test.expectedErr != "" && test.expectedErr != err.Error()) {
 				t.Fatalf("expected error: %s, got: %s", test.expectedErr, err)
 			}
@@ -130,7 +130,7 @@ func TestListSpaceDevsAndManagers(t *testing.T) {
 	}
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
-			devs, managers := ListSpaceDevsAndManagers(test.userGUIDs, test.roles)
+			devs, managers := listSpaceDevsAndManagers(test.userGUIDs, test.roles)
 			if diff := cmp.Diff(test.expectedDevs, devs); diff != "" {
 				t.Errorf("ListSpaceDevsAndManagers() mismatch (-want +got):\n%s", diff)
 			}
@@ -361,7 +361,7 @@ func TestListPurgeSpaces(t *testing.T) {
 	}
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
-			toNotify, toPurge, err := ListPurgeSpaces(
+			toNotify, toPurge, err := listPurgeSpaces(
 				test.spaces,
 				test.apps,
 				test.instances,
@@ -464,7 +464,7 @@ func TestGetFirstResource(t *testing.T) {
 	}
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
-			firstResource, err := GetFirstResource(
+			firstResource, err := letFirstResource(
 				test.space,
 				test.apps,
 				test.instances,

@@ -42,7 +42,7 @@ func main() {
 		log.Fatalf("error creating client: %s", err.Error())
 	}
 
-	orgs, err := ListSandboxOrgs(ctx, cfClient, opts.OrgPrefix)
+	orgs, err := listSandboxOrgs(ctx, cfClient, opts.OrgPrefix)
 	if err != nil {
 		log.Fatalf("error getting orgs: %s", err.Error())
 	}
@@ -73,12 +73,12 @@ func main() {
 
 	for _, org := range orgs {
 		log.Printf("getting org resources for org %s", org.Name)
-		spaces, apps, instances, err := ListOrgResources(ctx, cfClient, org)
+		spaces, apps, instances, err := listOrgResources(ctx, cfClient, org)
 		if err != nil {
 			log.Fatalf("error listing org resources for org %s: %s", org.Name, err.Error())
 		}
 
-		toNotify, toPurge, err := ListPurgeSpaces(spaces, apps, instances, now, opts.NotifyDays, opts.PurgeDays, timeStartsAt)
+		toNotify, toPurge, err := listPurgeSpaces(spaces, apps, instances, now, opts.NotifyDays, opts.PurgeDays, timeStartsAt)
 		if err != nil {
 			log.Fatalf("error listing spaces to purge for org %s: %s", org.Name, err.Error())
 		}

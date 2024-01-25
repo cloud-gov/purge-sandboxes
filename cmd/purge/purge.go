@@ -38,12 +38,12 @@ func purgeAndRecreateSpace(
 		return fmt.Errorf("error listing users on space %s: %w", details.Space.Name, err)
 	}
 
-	recipients, err := ListRecipients(userGUIDs, spaceUsers)
+	recipients, err := listRecipients(userGUIDs, spaceUsers)
 	if err != nil {
 		return fmt.Errorf("error listing recipients on space %s: %w", details.Space.Name, err)
 	}
 
-	developers, managers := ListSpaceDevsAndManagers(userGUIDs, spaceRoles)
+	developers, managers := listSpaceDevsAndManagers(userGUIDs, spaceRoles)
 	log.Printf("Purging space %s; recipients: %+v, developers: %+v, managers: %+v", details.Space.Name, recipients, developers, managers)
 
 	if !opts.DryRun {
@@ -63,7 +63,7 @@ func purgeAndRecreateSpace(
 		}
 
 		log.Printf("deleting and recreating space %s", details.Space.Name)
-		if err := PurgeSpace(ctx, cfClient, details.Space); err != nil {
+		if err := purgeSpace(ctx, cfClient, details.Space); err != nil {
 			return fmt.Errorf("error purging space %s in org %s: %w", details.Space.Name, org.Name, err)
 		}
 
@@ -77,7 +77,7 @@ func purgeAndRecreateSpace(
 				return fmt.Errorf("error recreating space %s in org %s: %w", details.Space.Name, org.Name, err)
 			}
 			log.Printf("recreating space roles")
-			if err := RecreateSpaceDevsAndManagers(ctx, cfClient, details.Space.GUID, developers, managers); err != nil {
+			if err := recreateSpaceDevsAndManagers(ctx, cfClient, details.Space.GUID, developers, managers); err != nil {
 				return fmt.Errorf("error recreating space developers/managers for space %s in org %s: %w", details.Space.Name, org.Name, err)
 			}
 		}
