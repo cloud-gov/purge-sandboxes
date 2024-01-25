@@ -28,7 +28,7 @@ type mailer interface {
 	) error
 }
 
-type SMTPMailer struct {
+type smtpMailer struct {
 	options SMTPOptions
 }
 
@@ -42,7 +42,7 @@ func renderTemplate(tmpl *template.Template, data map[string]interface{}) (strin
 }
 
 // sendMail sends email via SMTP
-func (m *SMTPMailer) sendMail(
+func (m *smtpMailer) sendMail(
 	opts SMTPOptions,
 	sender string,
 	subject string,
