@@ -18,6 +18,20 @@ type SMTPOptions struct {
 	SMTPCert string `env:"SMTP_CERT"`
 }
 
+type mailer interface {
+	sendMail(
+		opts SMTPOptions,
+		sender string,
+		subject string,
+		body string,
+		recipients []string,
+	) error
+}
+
+type SMTPMailer struct {
+	options SMTPOptions
+}
+
 // renderTemplate renders a template to string
 func renderTemplate(tmpl *template.Template, data map[string]interface{}) (string, error) {
 	buf := bytes.Buffer{}
@@ -28,7 +42,7 @@ func renderTemplate(tmpl *template.Template, data map[string]interface{}) (strin
 }
 
 // sendMail sends email via SMTP
-func sendMail(
+func (m *SMTPMailer) sendMail(
 	opts SMTPOptions,
 	sender string,
 	subject string,
@@ -53,12 +67,12 @@ func sendMail(
 		return err
 	}
 
-	m := gomail.NewMessage()
-	m.SetHeaders(map[string][]string{
+	msg := gomail.NewMessage()
+	msg.SetHeaders(map[string][]string{
 		"From":    {sender},
 		"Subject": {subject},
 		"To":      recipients,
 	})
-	m.SetBody("text/html", body)
-	return gomail.Send(s, m)
+	msg.SetBody("text/html", body)
+	return gomail.Send(s, msg)
 }

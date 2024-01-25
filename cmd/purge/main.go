@@ -83,9 +83,13 @@ func main() {
 			log.Fatalf("error listing spaces to purge for org %s: %s", org.Name, err.Error())
 		}
 
+		smtpMailer := &SMTPMailer{
+			options: opts.SMTPOptions,
+		}
+
 		log.Printf("notifying %d spaces in org %s", len(toNotify), org.Name)
 		for _, details := range toNotify {
-			err = notifySpaceUsers(ctx, cfClient, opts, userGUIDs, org, details)
+			err = notifySpaceUsers(ctx, cfClient, opts, userGUIDs, org, details, smtpMailer)
 			if err != nil {
 				log.Fatalf("error notifying space %s in org %s: %s", details.Space.Name, org.Name, err)
 			}
@@ -93,7 +97,7 @@ func main() {
 
 		log.Printf("purging %d spaces in org %s", len(toPurge), org.Name)
 		for _, details := range toPurge {
-			err = purgeAndRecreateSpace(ctx, cfClient, opts, userGUIDs, org, details)
+			err = purgeAndRecreateSpace(ctx, cfClient, opts, userGUIDs, org, details, smtpMailer)
 			if err != nil {
 				allPurgeErrors = append(allPurgeErrors, err.Error())
 			}

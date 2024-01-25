@@ -17,6 +17,7 @@ func notifySpaceUsers(
 	userGUIDs map[string]bool,
 	org *resource.Organization,
 	details SpaceDetails,
+	mailSender mailer,
 ) error {
 	notifyTemplate, err := template.ParseFiles("../../templates/base.html", "../../templates/notify.tmpl")
 	if err != nil {
@@ -49,7 +50,7 @@ func notifySpaceUsers(
 
 		log.Printf("sending to %s: %s", recipients, body)
 
-		if err := sendMail(opts.SMTPOptions, opts.MailSender, opts.NotifyMailSubject, body, recipients); err != nil {
+		if err := mailSender.sendMail(opts.SMTPOptions, opts.MailSender, opts.NotifyMailSubject, body, recipients); err != nil {
 			return fmt.Errorf("error sending mail on space %s: %w", details.Space.Name, err)
 		}
 	}

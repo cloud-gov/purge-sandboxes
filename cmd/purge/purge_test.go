@@ -89,6 +89,18 @@ func (s *mockSpaces) Delete(ctx context.Context, guid string) (string, error) {
 	return "", nil
 }
 
+type mockMailSender struct{}
+
+func (m *mockMailSender) sendMail(
+	opts SMTPOptions,
+	sender string,
+	subject string,
+	body string,
+	recipients []string,
+) error {
+	return nil
+}
+
 func TestPurgeAndRecreateSpace(t *testing.T) {
 	userGUIDs := map[string]bool{
 		"user-1": true,
@@ -133,13 +145,14 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 		},
 		userGUIDs,
 		&resource.Organization{
-			Name: "foobar",
+			GUID: "org-1",
 		},
 		SpaceDetails{
 			Space: &resource.Space{
 				GUID: "space-1",
 			},
 		},
+		&mockMailSender{},
 	)
 
 	if err != nil {
