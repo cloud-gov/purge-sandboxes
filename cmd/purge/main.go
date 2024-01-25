@@ -92,13 +92,9 @@ func main() {
 			log.Fatalf("error listing spaces to purge for org %s: %s", org.Name, err.Error())
 		}
 
-		var (
-			recipients []string
-		)
-
 		log.Printf("notifying %d spaces in org %s", len(toNotify), org.Name)
 		for _, details := range toNotify {
-			recipients, err = notifySpaceUsers(ctx, cfClient, opts, userGUIDs, org, details)
+			err = notifySpaceUsers(ctx, cfClient, opts, userGUIDs, org, details)
 			if err != nil {
 				log.Fatalf("error notifying space %s in org %s: %s", details.Space.Name, org.Name, err)
 			}
@@ -106,8 +102,10 @@ func main() {
 
 		log.Printf("purging %d spaces in org %s", len(toPurge), org.Name)
 		for _, details := range toPurge {
-			purgeErrors := purgeSpace(ctx, cfClient, opts, userGUIDs, org, details, recipients)
-			allPurgeErrors = append(allPurgeErrors, purgeErrors...)
+			err = purgeSpace(ctx, cfClient, opts, userGUIDs, org, details)
+			if err != nil {
+				allPurgeErrors = append(allPurgeErrors, err.Error())
+			}
 		}
 	}
 

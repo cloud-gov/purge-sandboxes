@@ -18,14 +18,11 @@ func purgeSpace(
 	userGUIDs map[string]bool,
 	org *resource.Organization,
 	details sandbox.SpaceDetails,
-	recipients []string,
-) []string {
+) error {
 	purgeTemplate, err := template.ParseFiles("./templates/base.html", "./templates/purge.tmpl")
 	if err != nil {
 		log.Fatalf("error reading purge template: %s", err.Error())
 	}
-
-	var purgeErrors []string
 
 	spaceRoles, err := cfClient.Roles.ListAll(ctx, &client.RoleListOptions{
 		SpaceGUIDs: client.Filter{
@@ -37,8 +34,18 @@ func purgeSpace(
 		log.Fatalf("error listing roles on space %s: %s", details.Space.Name, err.Error())
 	}
 
+	spaceUsers, err := cfClient.Spaces.ListUsersAll(ctx, details.Space.GUID, nil)
+	if err != nil {
+		return fmt.Errorf("error listing users on space %s: %w", details.Space.Name, err)
+	}
+
+	recipients, err := sandbox.ListRecipients(userGUIDs, spaceUsers)
+	if err != nil {
+		return fmt.Errorf("error listing recipients on space %s: %w", details.Space.Name, err)
+	}
+
 	developers, managers := sandbox.ListSpaceDevsAndManagers(userGUIDs, spaceRoles)
-	log.Printf("Purging space %s; recipients %+v", details.Space.Name, recipients)
+	log.Printf("Purging space %s; recipients: %+v, developers: %+v, managers: %+v", details.Space.Name, recipients, developers, managers)
 
 	if !opts.DryRun {
 		data := map[string]interface{}{
@@ -58,8 +65,7 @@ func purgeSpace(
 
 		log.Printf("deleting and recreating space %s", details.Space.Name)
 		if err := sandbox.PurgeSpace(ctx, cfClient, details.Space); err != nil {
-			purgeErrors = append(purgeErrors, fmt.Sprintf("error purging space %s in org %s: %s", details.Space.Name, org.Name, err.Error()))
-			return purgeErrors
+			return fmt.Errorf("error purging space %s in org %s: %w", details.Space.Name, org.Name, err)
 		}
 
 		if len(developers) > 0 || len(managers) > 0 {
@@ -69,16 +75,14 @@ func purgeSpace(
 			}
 			log.Printf("recreating space: %+v", spaceRequest)
 			if _, err := cfClient.Spaces.Create(ctx, &resource.SpaceCreate{}); err != nil {
-				purgeErrors = append(purgeErrors, fmt.Sprintf("error recreating space %s in org %s: %s", details.Space.Name, org.Name, err.Error()))
-				return purgeErrors
+				return fmt.Errorf("error recreating space %s in org %s: %w", details.Space.Name, org.Name, err)
 			}
 			log.Printf("recreating space roles")
 			if err := sandbox.RecreateSpaceDevsAndManagers(ctx, cfClient, details.Space.GUID, developers, managers); err != nil {
-				purgeErrors = append(purgeErrors, fmt.Sprintf("error recreating space developers/managers for space %s in org %s: %s", details.Space.Name, org.Name, err.Error()))
-				return purgeErrors
+				return fmt.Errorf("error recreating space developers/managers for space %s in org %s: %w", details.Space.Name, org.Name, err)
 			}
 		}
 	}
 
-	return purgeErrors
+	return nil
 }

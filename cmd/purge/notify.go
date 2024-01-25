@@ -19,22 +19,20 @@ func notifySpaceUsers(
 	userGUIDs map[string]bool,
 	org *resource.Organization,
 	details sandbox.SpaceDetails,
-) ([]string, error) {
-	var recipients []string
-
+) error {
 	notifyTemplate, err := template.ParseFiles("./templates/base.html", "./templates/notify.tmpl")
 	if err != nil {
-		return recipients, fmt.Errorf("error reading notify template: %w", err)
+		return fmt.Errorf("error reading notify template: %w", err)
 	}
 
 	spaceUsers, err := cfClient.Spaces.ListUsersAll(ctx, details.Space.GUID, nil)
 	if err != nil {
-		return recipients, fmt.Errorf("error listing roles on space %s: %w", details.Space.Name, err)
+		return fmt.Errorf("error listing users on space %s: %w", details.Space.Name, err)
 	}
 
-	recipients, err = sandbox.ListRecipients(userGUIDs, spaceUsers)
+	recipients, err := sandbox.ListRecipients(userGUIDs, spaceUsers)
 	if err != nil {
-		return recipients, fmt.Errorf("error listing recipients on space %s: %w", details.Space.Name, err)
+		return fmt.Errorf("error listing recipients on space %s: %w", details.Space.Name, err)
 	}
 
 	log.Printf("Notifying space %s; recipients %+v", details.Space.Name, recipients)
@@ -48,15 +46,15 @@ func notifySpaceUsers(
 
 		body, err := sandbox.RenderTemplate(notifyTemplate, data)
 		if err != nil {
-			return recipients, fmt.Errorf("error rendering email: %w", err)
+			return fmt.Errorf("error rendering email: %w", err)
 		}
 
 		log.Printf("sending to %s: %s", recipients, body)
 
 		if err := sandbox.SendMail(opts.SMTPOptions, opts.MailSender, opts.NotifyMailSubject, body, recipients); err != nil {
-			return recipients, fmt.Errorf("error sending mail on space %s: %w", details.Space.Name, err)
+			return fmt.Errorf("error sending mail on space %s: %w", details.Space.Name, err)
 		}
 	}
 
-	return recipients, nil
+	return nil
 }
