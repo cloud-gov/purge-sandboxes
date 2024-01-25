@@ -1,4 +1,4 @@
-package sandbox
+package main
 
 import (
 	"bytes"
@@ -65,7 +65,7 @@ func ListSpaceDevsAndManagers(
 
 func RecreateSpaceDevsAndManagers(
 	ctx context.Context,
-	cfClient *client.Client,
+	cfClient *cfResourceClient,
 	spaceGUID string,
 	developers []string,
 	managers []string,
@@ -86,7 +86,11 @@ func RecreateSpaceDevsAndManagers(
 }
 
 // PurgeSpace deletes a space; if the delete fails, it deletes all applications within the space
-func PurgeSpace(ctx context.Context, cfClient *client.Client, space *resource.Space) error {
+func PurgeSpace(
+	ctx context.Context,
+	cfClient *cfResourceClient,
+	space *resource.Space,
+) error {
 	_, spaceErr := cfClient.Spaces.Delete(ctx, space.GUID)
 	if spaceErr != nil {
 		apps, err := cfClient.Applications.ListAll(ctx, &client.AppListOptions{
@@ -156,12 +160,12 @@ func SendMail(
 // ListSandboxOrgs lists all sandbox organizations
 func ListSandboxOrgs(
 	ctx context.Context,
-	client *client.Client,
+	cfClient *cfResourceClient,
 	prefix string,
 ) ([]*resource.Organization, error) {
 	sandboxes := []*resource.Organization{}
 
-	orgs, err := client.Organizations.ListAll(ctx, nil)
+	orgs, err := cfClient.Organizations.ListAll(ctx, nil)
 	if err != nil {
 		return sandboxes, err
 	}
@@ -178,7 +182,7 @@ func ListSandboxOrgs(
 // ListOrgResources fetches apps, service instances, and spaces within an organization
 func ListOrgResources(
 	ctx context.Context,
-	cfClient *client.Client,
+	cfClient *cfResourceClient,
 	org *resource.Organization,
 ) (
 	spaces []*resource.Space,

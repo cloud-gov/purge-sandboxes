@@ -6,18 +6,17 @@ import (
 	"html/template"
 	"log"
 
-	"github.com/18f/cg-sandbox/sandbox"
 	"github.com/cloudfoundry-community/go-cfclient/v3/client"
 	"github.com/cloudfoundry-community/go-cfclient/v3/resource"
 )
 
-func purgeSpace(
+func purgeAndRecreateSpace(
 	ctx context.Context,
-	cfClient *client.Client,
+	cfClient *cfResourceClient,
 	opts Options,
 	userGUIDs map[string]bool,
 	org *resource.Organization,
-	details sandbox.SpaceDetails,
+	details SpaceDetails,
 ) error {
 	purgeTemplate, err := template.ParseFiles("./templates/base.html", "./templates/purge.tmpl")
 	if err != nil {
@@ -39,12 +38,12 @@ func purgeSpace(
 		return fmt.Errorf("error listing users on space %s: %w", details.Space.Name, err)
 	}
 
-	recipients, err := sandbox.ListRecipients(userGUIDs, spaceUsers)
+	recipients, err := ListRecipients(userGUIDs, spaceUsers)
 	if err != nil {
 		return fmt.Errorf("error listing recipients on space %s: %w", details.Space.Name, err)
 	}
 
-	developers, managers := sandbox.ListSpaceDevsAndManagers(userGUIDs, spaceRoles)
+	developers, managers := ListSpaceDevsAndManagers(userGUIDs, spaceRoles)
 	log.Printf("Purging space %s; recipients: %+v, developers: %+v, managers: %+v", details.Space.Name, recipients, developers, managers)
 
 	if !opts.DryRun {
@@ -53,18 +52,18 @@ func purgeSpace(
 			"space": details.Space,
 			"days":  opts.PurgeDays,
 		}
-		body, err := sandbox.RenderTemplate(purgeTemplate, data)
+		body, err := RenderTemplate(purgeTemplate, data)
 		if err != nil {
 			log.Fatalf("error rendering email: %s", err.Error())
 		}
 
 		log.Printf("sending to %s: %s", recipients, body)
-		if err := sandbox.SendMail(opts.SMTPOptions, opts.MailSender, opts.PurgeMailSubject, body, recipients); err != nil {
+		if err := SendMail(opts.SMTPOptions, opts.MailSender, opts.PurgeMailSubject, body, recipients); err != nil {
 			log.Fatalf("error sending mail on space %s: %s", details.Space.Name, err.Error())
 		}
 
 		log.Printf("deleting and recreating space %s", details.Space.Name)
-		if err := sandbox.PurgeSpace(ctx, cfClient, details.Space); err != nil {
+		if err := PurgeSpace(ctx, cfClient, details.Space); err != nil {
 			return fmt.Errorf("error purging space %s in org %s: %w", details.Space.Name, org.Name, err)
 		}
 
@@ -78,7 +77,7 @@ func purgeSpace(
 				return fmt.Errorf("error recreating space %s in org %s: %w", details.Space.Name, org.Name, err)
 			}
 			log.Printf("recreating space roles")
-			if err := sandbox.RecreateSpaceDevsAndManagers(ctx, cfClient, details.Space.GUID, developers, managers); err != nil {
+			if err := RecreateSpaceDevsAndManagers(ctx, cfClient, details.Space.GUID, developers, managers); err != nil {
 				return fmt.Errorf("error recreating space developers/managers for space %s in org %s: %w", details.Space.Name, org.Name, err)
 			}
 		}

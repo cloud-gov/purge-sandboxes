@@ -6,12 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cloudfoundry-community/go-cfclient/v3/client"
-	"github.com/cloudfoundry-community/go-cfclient/v3/config"
-
 	"github.com/sethvargo/go-envconfig"
-
-	"github.com/18f/cg-sandbox/sandbox"
 )
 
 // Options describes common configuration
@@ -27,7 +22,7 @@ type Options struct {
 	PurgeMailSubject  string `env:"PURGE_MAIL_SUBJECT, required"`
 	DryRun            bool   `env:"DRY_RUN, default=true"`
 	TimeStartsAt      string `env:"TIME_STARTS_AT"`
-	sandbox.SMTPOptions
+	SMTPOptions
 }
 
 func main() {
@@ -38,7 +33,7 @@ func main() {
 		log.Fatalf("error parsing options: %s", err.Error())
 	}
 
-	cfg, err := config.NewClientSecret(
+	cfClient, err := newCFClient(
 		opts.APIAddress,
 		opts.ClientID,
 		opts.ClientSecret,
@@ -46,12 +41,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("error creating client: %s", err.Error())
 	}
-	cfClient, err := client.New(cfg)
-	if err != nil {
-		log.Fatalf("error creating client: %s", err.Error())
-	}
 
-	orgs, err := sandbox.ListSandboxOrgs(ctx, cfClient, opts.OrgPrefix)
+	orgs, err := ListSandboxOrgs(ctx, cfClient, opts.OrgPrefix)
 	if err != nil {
 		log.Fatalf("error getting orgs: %s", err.Error())
 	}
@@ -82,12 +73,12 @@ func main() {
 
 	for _, org := range orgs {
 		log.Printf("getting org resources for org %s", org.Name)
-		spaces, apps, instances, err := sandbox.ListOrgResources(ctx, cfClient, org)
+		spaces, apps, instances, err := ListOrgResources(ctx, cfClient, org)
 		if err != nil {
 			log.Fatalf("error listing org resources for org %s: %s", org.Name, err.Error())
 		}
 
-		toNotify, toPurge, err := sandbox.ListPurgeSpaces(spaces, apps, instances, now, opts.NotifyDays, opts.PurgeDays, timeStartsAt)
+		toNotify, toPurge, err := ListPurgeSpaces(spaces, apps, instances, now, opts.NotifyDays, opts.PurgeDays, timeStartsAt)
 		if err != nil {
 			log.Fatalf("error listing spaces to purge for org %s: %s", org.Name, err.Error())
 		}
@@ -102,7 +93,7 @@ func main() {
 
 		log.Printf("purging %d spaces in org %s", len(toPurge), org.Name)
 		for _, details := range toPurge {
-			err = purgeSpace(ctx, cfClient, opts, userGUIDs, org, details)
+			err = purgeAndRecreateSpace(ctx, cfClient, opts, userGUIDs, org, details)
 			if err != nil {
 				allPurgeErrors = append(allPurgeErrors, err.Error())
 			}

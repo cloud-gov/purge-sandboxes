@@ -1,4 +1,4 @@
-package sandbox
+package main
 
 import (
 	"html/template"
@@ -482,12 +482,12 @@ func TestGetFirstResource(t *testing.T) {
 }
 
 func TestRenderTemplate(t *testing.T) {
-	notifyTemplate, err := template.ParseFiles("../templates/base.html", "../templates/notify.tmpl")
+	notifyTemplate, err := template.ParseFiles("../../templates/base.html", "../../templates/notify.tmpl")
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
 
-	purgeTemplate, err := template.ParseFiles("../templates/base.html", "../templates/purge.tmpl")
+	purgeTemplate, err := template.ParseFiles("../../templates/base.html", "../../templates/purge.tmpl")
 	if err != nil {
 		t.Fatalf("unexpected error: %s", err)
 	}
@@ -510,7 +510,7 @@ func TestRenderTemplate(t *testing.T) {
 				"date": time.Date(2009, 11, 17, 20, 34, 58, 651387237, time.UTC),
 				"days": 90,
 			},
-			expectedTestFile: "../testdata/notify.html",
+			expectedTestFile: "../../testdata/notify.html",
 		},
 		"constructs the appropriate purge template": {
 			tpl: purgeTemplate,
@@ -524,7 +524,7 @@ func TestRenderTemplate(t *testing.T) {
 				"date": time.Date(2009, 11, 17, 20, 34, 58, 651387237, time.UTC),
 				"days": 90,
 			},
-			expectedTestFile: "../testdata/purge.html",
+			expectedTestFile: "../../testdata/purge.html",
 		},
 	}
 	for name, test := range testCases {

@@ -7,18 +7,16 @@ import (
 	"log"
 	"time"
 
-	"github.com/18f/cg-sandbox/sandbox"
-	"github.com/cloudfoundry-community/go-cfclient/v3/client"
 	"github.com/cloudfoundry-community/go-cfclient/v3/resource"
 )
 
 func notifySpaceUsers(
 	ctx context.Context,
-	cfClient *client.Client,
+	cfClient *cfResourceClient,
 	opts Options,
 	userGUIDs map[string]bool,
 	org *resource.Organization,
-	details sandbox.SpaceDetails,
+	details SpaceDetails,
 ) error {
 	notifyTemplate, err := template.ParseFiles("./templates/base.html", "./templates/notify.tmpl")
 	if err != nil {
@@ -30,7 +28,7 @@ func notifySpaceUsers(
 		return fmt.Errorf("error listing users on space %s: %w", details.Space.Name, err)
 	}
 
-	recipients, err := sandbox.ListRecipients(userGUIDs, spaceUsers)
+	recipients, err := ListRecipients(userGUIDs, spaceUsers)
 	if err != nil {
 		return fmt.Errorf("error listing recipients on space %s: %w", details.Space.Name, err)
 	}
@@ -44,14 +42,14 @@ func notifySpaceUsers(
 			"days":  opts.PurgeDays,
 		}
 
-		body, err := sandbox.RenderTemplate(notifyTemplate, data)
+		body, err := RenderTemplate(notifyTemplate, data)
 		if err != nil {
 			return fmt.Errorf("error rendering email: %w", err)
 		}
 
 		log.Printf("sending to %s: %s", recipients, body)
 
-		if err := sandbox.SendMail(opts.SMTPOptions, opts.MailSender, opts.NotifyMailSubject, body, recipients); err != nil {
+		if err := SendMail(opts.SMTPOptions, opts.MailSender, opts.NotifyMailSubject, body, recipients); err != nil {
 			return fmt.Errorf("error sending mail on space %s: %w", details.Space.Name, err)
 		}
 	}
