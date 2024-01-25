@@ -42,14 +42,14 @@ func notifySpaceUsers(
 			"days":  opts.PurgeDays,
 		}
 
-		body, err := RenderTemplate(notifyTemplate, data)
+		body, err := renderTemplate(notifyTemplate, data)
 		if err != nil {
 			return fmt.Errorf("error rendering email: %w", err)
 		}
 
 		log.Printf("sending to %s: %s", recipients, body)
 
-		if err := SendMail(opts.SMTPOptions, opts.MailSender, opts.NotifyMailSubject, body, recipients); err != nil {
+		if err := sendMail(opts.SMTPOptions, opts.MailSender, opts.NotifyMailSubject, body, recipients); err != nil {
 			return fmt.Errorf("error sending mail on space %s: %w", details.Space.Name, err)
 		}
 	}

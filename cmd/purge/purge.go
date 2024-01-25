@@ -52,13 +52,13 @@ func purgeAndRecreateSpace(
 			"space": details.Space,
 			"days":  opts.PurgeDays,
 		}
-		body, err := RenderTemplate(purgeTemplate, data)
+		body, err := renderTemplate(purgeTemplate, data)
 		if err != nil {
 			log.Fatalf("error rendering email: %s", err.Error())
 		}
 
 		log.Printf("sending to %s: %s", recipients, body)
-		if err := SendMail(opts.SMTPOptions, opts.MailSender, opts.PurgeMailSubject, body, recipients); err != nil {
+		if err := sendMail(opts.SMTPOptions, opts.MailSender, opts.PurgeMailSubject, body, recipients); err != nil {
 			log.Fatalf("error sending mail on space %s: %s", details.Space.Name, err.Error())
 		}
 

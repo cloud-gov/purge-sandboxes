@@ -1,28 +1,14 @@
 package main
 
 import (
-	"bytes"
 	"context"
-	"crypto/tls"
-	"crypto/x509"
-	"html/template"
 	"net/mail"
 	"strings"
 	"time"
 
 	"github.com/cloudfoundry-community/go-cfclient/v3/client"
 	"github.com/cloudfoundry-community/go-cfclient/v3/resource"
-	"gopkg.in/gomail.v2"
 )
-
-// SMTPOptions describes configation for sending mail via SMTP
-type SMTPOptions struct {
-	SMTPHost string `env:"SMTP_HOST, required"`
-	SMTPPort int    `env:"SMTP_PORT, default=587"`
-	SMTPUser string `env:"SMTP_USER, required"`
-	SMTPPass string `env:"SMTP_PASS, required"`
-	SMTPCert string `env:"SMTP_CERT"`
-}
 
 // ListRecipients get a list of recipient emails from space users
 func ListRecipients(
@@ -110,51 +96,6 @@ func PurgeSpace(
 		return spaceErr
 	}
 	return nil
-}
-
-// RenderTemplate renders a template to string
-func RenderTemplate(tmpl *template.Template, data map[string]interface{}) (string, error) {
-	buf := bytes.Buffer{}
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", err
-	}
-	return buf.String(), nil
-}
-
-// SendMail sends email via SMTP
-func SendMail(
-	opts SMTPOptions,
-	sender string,
-	subject string,
-	body string,
-	recipients []string,
-) error {
-	if len(recipients) == 0 {
-		return nil
-	}
-
-	d := gomail.NewDialer(opts.SMTPHost, opts.SMTPPort, opts.SMTPUser, opts.SMTPPass)
-	if opts.SMTPCert != "" {
-		pool := x509.NewCertPool()
-		pool.AppendCertsFromPEM([]byte(opts.SMTPCert))
-		d.TLSConfig = &tls.Config{
-			ServerName: opts.SMTPHost,
-			RootCAs:    pool,
-		}
-	}
-	s, err := d.Dial()
-	if err != nil {
-		return err
-	}
-
-	m := gomail.NewMessage()
-	m.SetHeaders(map[string][]string{
-		"From":    {sender},
-		"Subject": {subject},
-		"To":      recipients,
-	})
-	m.SetBody("text/html", body)
-	return gomail.Send(s, m)
 }
 
 // ListSandboxOrgs lists all sandbox organizations
