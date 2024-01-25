@@ -18,7 +18,7 @@ func notifySpaceUsers(
 	org *resource.Organization,
 	details SpaceDetails,
 ) error {
-	notifyTemplate, err := template.ParseFiles("./templates/base.html", "./templates/notify.tmpl")
+	notifyTemplate, err := template.ParseFiles("../../templates/base.html", "../../templates/notify.tmpl")
 	if err != nil {
 		return fmt.Errorf("error reading notify template: %w", err)
 	}

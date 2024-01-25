@@ -18,9 +18,9 @@ func purgeAndRecreateSpace(
 	org *resource.Organization,
 	details SpaceDetails,
 ) error {
-	purgeTemplate, err := template.ParseFiles("./templates/base.html", "./templates/purge.tmpl")
+	purgeTemplate, err := template.ParseFiles("../../templates/base.html", "../../templates/purge.tmpl")
 	if err != nil {
-		log.Fatalf("error reading purge template: %s", err.Error())
+		return fmt.Errorf("error reading purge template: %s", err)
 	}
 
 	spaceRoles, err := cfClient.Roles.ListAll(ctx, &client.RoleListOptions{
@@ -30,7 +30,7 @@ func purgeAndRecreateSpace(
 		Include: resource.RoleIncludeUser,
 	})
 	if err != nil {
-		log.Fatalf("error listing roles on space %s: %s", details.Space.Name, err.Error())
+		return fmt.Errorf("error listing roles on space %s: %w", details.Space.Name, err)
 	}
 
 	spaceUsers, err := cfClient.Spaces.ListUsersAll(ctx, details.Space.GUID, nil)
@@ -54,12 +54,12 @@ func purgeAndRecreateSpace(
 		}
 		body, err := renderTemplate(purgeTemplate, data)
 		if err != nil {
-			log.Fatalf("error rendering email: %s", err.Error())
+			return fmt.Errorf("error rendering email: %s", err)
 		}
 
 		log.Printf("sending to %s: %s", recipients, body)
 		if err := sendMail(opts.SMTPOptions, opts.MailSender, opts.PurgeMailSubject, body, recipients); err != nil {
-			log.Fatalf("error sending mail on space %s: %s", details.Space.Name, err.Error())
+			return fmt.Errorf("error sending mail on space %s: %w", details.Space.Name, err)
 		}
 
 		log.Printf("deleting and recreating space %s", details.Space.Name)
