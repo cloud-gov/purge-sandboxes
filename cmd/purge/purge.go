@@ -42,29 +42,31 @@ func purgeAndRecreateSpace(
 	developers, managers := listSpaceDevsAndManagers(userGUIDs, spaceRoles)
 	log.Printf("Purging space %s; recipients: %+v, developers: %+v, managers: %+v", details.Space.Name, recipients, developers, managers)
 
-	if !opts.DryRun {
-		if err := sendPurgeEmail(ctx, cfClient, opts, org, details, recipients, mailSender); err != nil {
-			return fmt.Errorf("error sending purge notification email for space %s in org %s: %w", details.Space.Name, org.Name, err)
-		}
+	if opts.DryRun {
+		return nil
+	}
 
-		log.Printf("deleting and recreating space %s", details.Space.Name)
-		if err := purgeSpace(ctx, cfClient, details.Space); err != nil {
-			return fmt.Errorf("error purging space %s in org %s: %w", details.Space.Name, org.Name, err)
-		}
+	if err := sendPurgeEmail(ctx, cfClient, opts, org, details, recipients, mailSender); err != nil {
+		return fmt.Errorf("error sending purge notification email for space %s in org %s: %w", details.Space.Name, org.Name, err)
+	}
 
-		if len(developers) > 0 || len(managers) > 0 {
-			spaceRequest := &resource.SpaceCreate{
-				Name:          details.Space.Name,
-				Relationships: details.Space.Relationships,
-			}
-			log.Printf("recreating space: %+v", spaceRequest)
-			if _, err := cfClient.Spaces.Create(ctx, &resource.SpaceCreate{}); err != nil {
-				return fmt.Errorf("error recreating space %s in org %s: %w", details.Space.Name, org.Name, err)
-			}
-			log.Printf("recreating space roles")
-			if err := recreateSpaceDevsAndManagers(ctx, cfClient, details.Space.GUID, developers, managers); err != nil {
-				return fmt.Errorf("error recreating space developers/managers for space %s in org %s: %w", details.Space.Name, org.Name, err)
-			}
+	log.Printf("deleting and recreating space %s", details.Space.Name)
+	if err := purgeSpace(ctx, cfClient, details.Space); err != nil {
+		return fmt.Errorf("error purging space %s in org %s: %w", details.Space.Name, org.Name, err)
+	}
+
+	if len(developers) > 0 || len(managers) > 0 {
+		spaceRequest := &resource.SpaceCreate{
+			Name:          details.Space.Name,
+			Relationships: details.Space.Relationships,
+		}
+		log.Printf("recreating space: %+v", spaceRequest)
+		if _, err := cfClient.Spaces.Create(ctx, &resource.SpaceCreate{}); err != nil {
+			return fmt.Errorf("error recreating space %s in org %s: %w", details.Space.Name, org.Name, err)
+		}
+		log.Printf("recreating space roles")
+		if err := recreateSpaceDevsAndManagers(ctx, cfClient, details.Space.GUID, developers, managers); err != nil {
+			return fmt.Errorf("error recreating space developers/managers for space %s in org %s: %w", details.Space.Name, org.Name, err)
 		}
 	}
 

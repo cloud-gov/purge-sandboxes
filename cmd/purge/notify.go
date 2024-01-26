@@ -35,24 +35,26 @@ func notifySpaceUsers(
 	}
 
 	log.Printf("Notifying space %s; recipients %+v", details.Space.Name, recipients)
-	if !opts.DryRun {
-		data := map[string]interface{}{
-			"org":   org,
-			"space": details.Space,
-			"date":  details.Timestamp.Add(24 * time.Duration(opts.PurgeDays) * time.Hour),
-			"days":  opts.PurgeDays,
-		}
+	if opts.DryRun {
+		return nil
+	}
 
-		body, err := renderTemplate(notifyTemplate, data)
-		if err != nil {
-			return fmt.Errorf("error rendering email: %w", err)
-		}
+	data := map[string]interface{}{
+		"org":   org,
+		"space": details.Space,
+		"date":  details.Timestamp.Add(24 * time.Duration(opts.PurgeDays) * time.Hour),
+		"days":  opts.PurgeDays,
+	}
 
-		log.Printf("sending to %s: %s", recipients, body)
+	body, err := renderTemplate(notifyTemplate, data)
+	if err != nil {
+		return fmt.Errorf("error rendering email: %w", err)
+	}
 
-		if err := mailSender.sendMail(opts.SMTPOptions, opts.MailSender, opts.NotifyMailSubject, body, recipients); err != nil {
-			return fmt.Errorf("error sending mail on space %s: %w", details.Space.Name, err)
-		}
+	log.Printf("sending to %s: %s", recipients, body)
+
+	if err := mailSender.sendMail(opts.SMTPOptions, opts.MailSender, opts.NotifyMailSubject, body, recipients); err != nil {
+		return fmt.Errorf("error sending mail on space %s: %w", details.Space.Name, err)
 	}
 
 	return nil
