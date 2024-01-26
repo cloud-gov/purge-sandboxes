@@ -1,31 +1,17 @@
-package sandbox
+package main
 
 import (
-	"bytes"
 	"context"
-	"crypto/tls"
-	"crypto/x509"
-	"html/template"
 	"net/mail"
 	"strings"
 	"time"
 
 	"github.com/cloudfoundry-community/go-cfclient/v3/client"
 	"github.com/cloudfoundry-community/go-cfclient/v3/resource"
-	"gopkg.in/gomail.v2"
 )
 
-// SMTPOptions describes configation for sending mail via SMTP
-type SMTPOptions struct {
-	SMTPHost string `env:"SMTP_HOST, required"`
-	SMTPPort int    `env:"SMTP_PORT, default=587"`
-	SMTPUser string `env:"SMTP_USER, required"`
-	SMTPPass string `env:"SMTP_PASS, required"`
-	SMTPCert string `env:"SMTP_CERT"`
-}
-
-// ListRecipients get a list of recipient emails from space users
-func ListRecipients(
+// listRecipients get a list of recipient emails from space users
+func listRecipients(
 	userGUIDs map[string]bool,
 	spaceUsers []*resource.User,
 ) (addresses []string, err error) {
@@ -43,7 +29,7 @@ func ListRecipients(
 	return addresses, nil
 }
 
-func ListSpaceDevsAndManagers(
+func listSpaceDevsAndManagers(
 	userGUIDs map[string]bool,
 	spaceRoles []*resource.Role,
 ) (developers []string, managers []string) {
@@ -63,9 +49,9 @@ func ListSpaceDevsAndManagers(
 	return
 }
 
-func RecreateSpaceDevsAndManagers(
+func recreateSpaceDevsAndManagers(
 	ctx context.Context,
-	cfClient *client.Client,
+	cfClient *cfResourceClient,
 	spaceGUID string,
 	developers []string,
 	managers []string,
@@ -85,8 +71,12 @@ func RecreateSpaceDevsAndManagers(
 	return nil
 }
 
-// PurgeSpace deletes a space; if the delete fails, it deletes all applications within the space
-func PurgeSpace(ctx context.Context, cfClient *client.Client, space *resource.Space) error {
+// purgeSpace deletes a space; if the delete fails, it deletes all applications within the space
+func purgeSpace(
+	ctx context.Context,
+	cfClient *cfResourceClient,
+	space *resource.Space,
+) error {
 	_, spaceErr := cfClient.Spaces.Delete(ctx, space.GUID)
 	if spaceErr != nil {
 		apps, err := cfClient.Applications.ListAll(ctx, &client.AppListOptions{
@@ -108,60 +98,15 @@ func PurgeSpace(ctx context.Context, cfClient *client.Client, space *resource.Sp
 	return nil
 }
 
-// RenderTemplate renders a template to string
-func RenderTemplate(tmpl *template.Template, data map[string]interface{}) (string, error) {
-	buf := bytes.Buffer{}
-	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", err
-	}
-	return buf.String(), nil
-}
-
-// SendMail sends email via SMTP
-func SendMail(
-	opts SMTPOptions,
-	sender string,
-	subject string,
-	body string,
-	recipients []string,
-) error {
-	if len(recipients) == 0 {
-		return nil
-	}
-
-	d := gomail.NewDialer(opts.SMTPHost, opts.SMTPPort, opts.SMTPUser, opts.SMTPPass)
-	if opts.SMTPCert != "" {
-		pool := x509.NewCertPool()
-		pool.AppendCertsFromPEM([]byte(opts.SMTPCert))
-		d.TLSConfig = &tls.Config{
-			ServerName: opts.SMTPHost,
-			RootCAs:    pool,
-		}
-	}
-	s, err := d.Dial()
-	if err != nil {
-		return err
-	}
-
-	m := gomail.NewMessage()
-	m.SetHeaders(map[string][]string{
-		"From":    {sender},
-		"Subject": {subject},
-		"To":      recipients,
-	})
-	m.SetBody("text/html", body)
-	return gomail.Send(s, m)
-}
-
-// ListSandboxOrgs lists all sandbox organizations
-func ListSandboxOrgs(
+// listSandboxOrgs lists all sandbox organizations
+func listSandboxOrgs(
 	ctx context.Context,
-	client *client.Client,
+	cfClient *cfResourceClient,
 	prefix string,
 ) ([]*resource.Organization, error) {
 	sandboxes := []*resource.Organization{}
 
-	orgs, err := client.Organizations.ListAll(ctx, nil)
+	orgs, err := cfClient.Organizations.ListAll(ctx, nil)
 	if err != nil {
 		return sandboxes, err
 	}
@@ -175,10 +120,10 @@ func ListSandboxOrgs(
 	return sandboxes, nil
 }
 
-// ListOrgResources fetches apps, service instances, and spaces within an organization
-func ListOrgResources(
+// listOrgResources fetches apps, service instances, and spaces within an organization
+func listOrgResources(
 	ctx context.Context,
-	cfClient *client.Client,
+	cfClient *cfResourceClient,
 	org *resource.Organization,
 ) (
 	spaces []*resource.Space,
@@ -210,8 +155,8 @@ func ListOrgResources(
 	return
 }
 
-// GetFirstResource gets the creation timestamp of the earliest-created resource in a space
-func GetFirstResource(
+// letFirstResource gets the creation timestamp of the earliest-created resource in a space
+func letFirstResource(
 	space *resource.Space,
 	apps []*resource.App,
 	instances []*resource.ServiceInstance,
@@ -240,8 +185,8 @@ type SpaceDetails struct {
 	Space     *resource.Space
 }
 
-// ListPurgeSpaces identifies spaces that will be notified or purged
-func ListPurgeSpaces(
+// listPurgeSpaces identifies spaces that will be notified or purged
+func listPurgeSpaces(
 	spaces []*resource.Space,
 	apps []*resource.App,
 	instances []*resource.ServiceInstance,
@@ -256,7 +201,7 @@ func ListPurgeSpaces(
 ) {
 	var firstResource time.Time
 	for _, space := range spaces {
-		firstResource, err = GetFirstResource(space, apps, instances)
+		firstResource, err = letFirstResource(space, apps, instances)
 		if err != nil {
 			return
 		}
