@@ -45,20 +45,19 @@ func (r *mockRoles) CreateSpaceRole(ctx context.Context, spaceGUID, userGUID str
 	return nil, nil
 }
 
-func (r *mockRoles) ListAll(ctx context.Context, opts *client.RoleListOptions) ([]*resource.Role, error) {
+func (r *mockRoles) ListIncludeUsersAll(ctx context.Context, opts *client.RoleListOptions) ([]*resource.Role, []*resource.User, error) {
 	if r.listRolesErr != nil {
-		return nil, r.listRolesErr
+		return nil, nil, r.listRolesErr
 	}
 	expectedOpts := &client.RoleListOptions{
 		SpaceGUIDs: client.Filter{
 			Values: []string{r.spaceGUID},
 		},
-		Include: resource.RoleIncludeUser,
 	}
-	if !cmp.Equal(opts, expectedOpts) {
-		return nil, fmt.Errorf(cmp.Diff(opts, expectedOpts))
+	if !cmp.Equal(opts.SpaceGUIDs, expectedOpts.SpaceGUIDs) {
+		return nil, nil, fmt.Errorf(cmp.Diff(opts, expectedOpts))
 	}
-	return r.roles, nil
+	return r.roles, nil, nil
 }
 
 type mockSpaces struct {
