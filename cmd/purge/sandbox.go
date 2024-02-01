@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"log"
 	"net/mail"
 	"strings"
 	"time"
@@ -32,18 +33,42 @@ func listRecipients(
 func listSpaceDevsAndManagers(
 	userGUIDs map[string]bool,
 	spaceRoles []*resource.Role,
+	spaceUsers []*resource.User,
 ) (developers []string, managers []string) {
 	developers = []string{}
 	managers = []string{}
+	var usernamesMap map[string]string
+
 	for _, role := range spaceRoles {
-		if _, ok := userGUIDs[role.Relationships.User.Data.GUID]; !ok {
+		roleUserGUID := role.Relationships.User.Data.GUID
+		if _, ok := userGUIDs[roleUserGUID]; !ok {
+			continue
+		}
+
+		var username string
+
+		username = usernamesMap[roleUserGUID]
+		if username == "" {
+			if usernamesMap == nil {
+				usernamesMap = make(map[string]string)
+			}
+			for _, spaceUser := range spaceUsers {
+				if spaceUser.GUID == roleUserGUID {
+					usernamesMap[roleUserGUID] = spaceUser.Username
+					username = usernamesMap[roleUserGUID]
+				}
+			}
+		}
+
+		if username == "" {
+			log.Printf("Could not find a username for user GUID %s in role %s", roleUserGUID, role.Type)
 			continue
 		}
 
 		if role.Type == resource.SpaceRoleDeveloper.String() {
-			developers = append(developers, role.Relationships.User.Data.GUID)
+			developers = append(developers, username)
 		} else if role.Type == resource.SpaceRoleManager.String() {
-			managers = append(managers, role.Relationships.User.Data.GUID)
+			managers = append(managers, username)
 		}
 	}
 	return

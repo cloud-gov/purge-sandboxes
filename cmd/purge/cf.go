@@ -19,7 +19,7 @@ type OrganizationsClient interface {
 
 type RolesClient interface {
 	CreateSpaceRole(ctx context.Context, spaceGUID, userGUID string, roleType resource.SpaceRoleType) (*resource.Role, error)
-	ListAll(ctx context.Context, opts *client.RoleListOptions) ([]*resource.Role, error)
+	ListIncludeUsersAll(ctx context.Context, opts *client.RoleListOptions) ([]*resource.Role, []*resource.User, error)
 }
 
 type ServiceInstancesClient interface {

@@ -54,6 +54,7 @@ func TestListSpaceDevsAndManagers(t *testing.T) {
 	testCases := map[string]struct {
 		userGUIDs        map[string]bool
 		roles            []*resource.Role
+		users            []*resource.User
 		expectedDevs     []string
 		expectedManagers []string
 		expectedErr      string
@@ -62,6 +63,16 @@ func TestListSpaceDevsAndManagers(t *testing.T) {
 			userGUIDs: map[string]bool{
 				"user-1": true,
 				"user-2": true,
+			},
+			users: []*resource.User{
+				{
+					GUID:     "user-1",
+					Username: "foo1@bar.gov",
+				},
+				{
+					GUID:     "user-2",
+					Username: "foo2@bar.gov",
+				},
 			},
 			roles: []*resource.Role{
 				{
@@ -95,12 +106,22 @@ func TestListSpaceDevsAndManagers(t *testing.T) {
 					},
 				},
 			},
-			expectedDevs:     []string{"user-1", "user-2"},
-			expectedManagers: []string{"user-1"},
+			expectedDevs:     []string{"foo1@bar.gov", "foo2@bar.gov"},
+			expectedManagers: []string{"foo1@bar.gov"},
 		},
 		"skips users not in user GUIDs map": {
 			userGUIDs: map[string]bool{
 				"user-1": true,
+			},
+			users: []*resource.User{
+				{
+					GUID:     "user-1",
+					Username: "foo1@bar.gov",
+				},
+				{
+					GUID:     "user-2",
+					Username: "foo2@bar.gov",
+				},
 			},
 			roles: []*resource.Role{
 				{
@@ -124,18 +145,54 @@ func TestListSpaceDevsAndManagers(t *testing.T) {
 					},
 				},
 			},
-			expectedDevs:     []string{"user-1"},
+			expectedDevs:     []string{"foo1@bar.gov"},
+			expectedManagers: []string{},
+		},
+		"skips users without username": {
+			userGUIDs: map[string]bool{
+				"user-1": true,
+				"user-2": true,
+			},
+			users: []*resource.User{
+				{
+					GUID:     "user-1",
+					Username: "foo1@bar.gov",
+				},
+			},
+			roles: []*resource.Role{
+				{
+					Type: "space_developer",
+					Relationships: resource.RoleSpaceUserOrganizationRelationships{
+						User: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "user-1",
+							},
+						},
+					},
+				},
+				{
+					Type: "space_developer",
+					Relationships: resource.RoleSpaceUserOrganizationRelationships{
+						User: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "user-2",
+							},
+						},
+					},
+				},
+			},
+			expectedDevs:     []string{"foo1@bar.gov"},
 			expectedManagers: []string{},
 		},
 	}
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
-			devs, managers := listSpaceDevsAndManagers(test.userGUIDs, test.roles)
+			devs, managers := listSpaceDevsAndManagers(test.userGUIDs, test.roles, test.users)
 			if diff := cmp.Diff(test.expectedDevs, devs); diff != "" {
-				t.Errorf("ListSpaceDevsAndManagers() mismatch (-want +got):\n%s", diff)
+				t.Errorf("ListSpaceDevsAndManagers() developers mismatch (-want +got):\n%s", diff)
 			}
 			if diff := cmp.Diff(test.expectedManagers, managers); diff != "" {
-				t.Errorf("ListSpaceDevsAndManagers() mismatch (-want +got):\n%s", diff)
+				t.Errorf("ListSpaceDevsAndManagers() managers mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}

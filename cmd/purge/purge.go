@@ -19,19 +19,11 @@ func purgeAndRecreateSpace(
 	details SpaceDetails,
 	mailSender mailer,
 ) error {
-	spaceRoles, err := cfClient.Roles.ListAll(ctx, &client.RoleListOptions{
-		SpaceGUIDs: client.Filter{
-			Values: []string{details.Space.GUID},
-		},
-		Include: resource.RoleIncludeUser,
-	})
+	roleListOpts := client.NewRoleListOptions()
+	roleListOpts.SpaceGUIDs.Values = []string{details.Space.GUID}
+	spaceRoles, spaceUsers, err := cfClient.Roles.ListIncludeUsersAll(ctx, roleListOpts)
 	if err != nil {
-		return fmt.Errorf("error listing roles on space %s: %w", details.Space.Name, err)
-	}
-
-	spaceUsers, err := cfClient.Spaces.ListUsersAll(ctx, details.Space.GUID, nil)
-	if err != nil {
-		return fmt.Errorf("error listing users on space %s: %w", details.Space.Name, err)
+		return fmt.Errorf("error listing roles with users on space %s: %w", details.Space.Name, err)
 	}
 
 	recipients, err := listRecipients(userGUIDs, spaceUsers)
@@ -39,7 +31,7 @@ func purgeAndRecreateSpace(
 		return fmt.Errorf("error listing recipients on space %s: %w", details.Space.Name, err)
 	}
 
-	developers, managers := listSpaceDevsAndManagers(userGUIDs, spaceRoles)
+	developers, managers := listSpaceDevsAndManagers(userGUIDs, spaceRoles, spaceUsers)
 	log.Printf("Purging space %s; recipients: %+v, developers: %+v, managers: %+v", details.Space.Name, recipients, developers, managers)
 
 	if opts.DryRun {
