@@ -209,6 +209,7 @@ func TestListPurgeSpaces(t *testing.T) {
 		expectedToPurge  []SpaceDetails
 		notifyThreshold  int
 		purgeThreshold   int
+		opts             Options
 		expectedErr      string
 		timeStartsAt     time.Time
 	}{
@@ -216,10 +217,12 @@ func TestListPurgeSpaces(t *testing.T) {
 			spaces: []*resource.Space{
 				{GUID: "space-guid"},
 			},
-			now:             now.Truncate(24 * time.Hour),
-			notifyThreshold: 25,
-			purgeThreshold:  30,
-			timeStartsAt:    time.Time{},
+			now: now.Truncate(24 * time.Hour),
+			opts: Options{
+				NotifyDays: 25,
+				PurgeDays:  30,
+			},
+			timeStartsAt: time.Time{},
 		},
 		"skips spaces with recent resources": {
 			spaces: []*resource.Space{
@@ -239,9 +242,11 @@ func TestListPurgeSpaces(t *testing.T) {
 					CreatedAt: now.Add(-15 * 24 * time.Hour),
 				},
 			},
-			notifyThreshold: 25,
-			purgeThreshold:  30,
-			timeStartsAt:    time.Time{},
+			opts: Options{
+				NotifyDays: 25,
+				PurgeDays:  30,
+			},
+			timeStartsAt: time.Time{},
 		},
 		"notifies on spaces between thresholds": {
 			spaces: []*resource.Space{
@@ -261,9 +266,11 @@ func TestListPurgeSpaces(t *testing.T) {
 					CreatedAt: now.Add(-28 * 24 * time.Hour),
 				},
 			},
-			notifyThreshold: 25,
-			purgeThreshold:  30,
-			timeStartsAt:    time.Time{},
+			opts: Options{
+				NotifyDays: 25,
+				PurgeDays:  30,
+			},
+			timeStartsAt: time.Time{},
 			expectedToNotify: []SpaceDetails{
 				{
 					Timestamp: now.Add(-28 * 24 * time.Hour).Truncate(24 * time.Hour),
@@ -291,9 +298,11 @@ func TestListPurgeSpaces(t *testing.T) {
 					CreatedAt: now.Add(-25 * 24 * time.Hour),
 				},
 			},
-			notifyThreshold: 25,
-			purgeThreshold:  30,
-			timeStartsAt:    time.Time{},
+			opts: Options{
+				NotifyDays: 25,
+				PurgeDays:  30,
+			},
+			timeStartsAt: time.Time{},
 			expectedToNotify: []SpaceDetails{
 				{
 					Timestamp: now.Add(-25 * 24 * time.Hour).Truncate(24 * time.Hour),
@@ -321,9 +330,11 @@ func TestListPurgeSpaces(t *testing.T) {
 					CreatedAt: now.Add(-30 * 24 * time.Hour),
 				},
 			},
-			notifyThreshold: 25,
-			purgeThreshold:  30,
-			timeStartsAt:    time.Time{},
+			opts: Options{
+				NotifyDays: 25,
+				PurgeDays:  30,
+			},
+			timeStartsAt: time.Time{},
 			expectedToPurge: []SpaceDetails{
 				{
 					Timestamp: now.Add(-30 * 24 * time.Hour).Truncate(24 * time.Hour),
@@ -351,9 +362,11 @@ func TestListPurgeSpaces(t *testing.T) {
 					CreatedAt: now.Add(-31 * 24 * time.Hour),
 				},
 			},
-			notifyThreshold: 25,
-			purgeThreshold:  30,
-			timeStartsAt:    time.Time{},
+			opts: Options{
+				NotifyDays: 25,
+				PurgeDays:  30,
+			},
+			timeStartsAt: time.Time{},
 			expectedToPurge: []SpaceDetails{
 				{
 					Timestamp: now.Add(-31 * 24 * time.Hour).Truncate(24 * time.Hour),
@@ -381,9 +394,11 @@ func TestListPurgeSpaces(t *testing.T) {
 					CreatedAt: now.Add(-31 * 24 * time.Hour),
 				},
 			},
-			notifyThreshold: 25,
-			purgeThreshold:  30,
-			timeStartsAt:    now.Add(-60 * 24 * time.Hour),
+			opts: Options{
+				NotifyDays: 25,
+				PurgeDays:  30,
+			},
+			timeStartsAt: now.Add(-60 * 24 * time.Hour),
 			expectedToPurge: []SpaceDetails{
 				{
 					Timestamp: now.Add(-31 * 24 * time.Hour).Truncate(24 * time.Hour),
@@ -411,9 +426,69 @@ func TestListPurgeSpaces(t *testing.T) {
 					CreatedAt: now.Add(-31 * 24 * time.Hour),
 				},
 			},
-			notifyThreshold: 25,
-			purgeThreshold:  30,
-			timeStartsAt:    now,
+			opts: Options{
+				NotifyDays: 25,
+				PurgeDays:  30,
+			},
+			timeStartsAt: now,
+		},
+		"notifies when purge is disabled even if time is past purge threshold": {
+			spaces: []*resource.Space{
+				{GUID: "space-guid"},
+			},
+			now: now.Truncate(24 * time.Hour),
+			apps: []*resource.App{
+				{
+					GUID: "app-guid",
+					Relationships: resource.SpaceRelationship{
+						Space: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-31 * 24 * time.Hour),
+				},
+			},
+			opts: Options{
+				NotifyDays:   25,
+				PurgeDays:    30,
+				DisablePurge: true,
+			},
+			timeStartsAt: time.Time{},
+			expectedToNotify: []SpaceDetails{
+				{
+					Timestamp: now.Add(-31 * 24 * time.Hour).Truncate(24 * time.Hour),
+					Space: &resource.Space{
+						GUID: "space-guid",
+					},
+				},
+			},
+		},
+		"does not notify or purge when purge is disabled if time is past purge threshold but not notify threshold": {
+			spaces: []*resource.Space{
+				{GUID: "space-guid"},
+			},
+			now: now.Truncate(24 * time.Hour),
+			apps: []*resource.App{
+				{
+					GUID: "app-guid",
+					Relationships: resource.SpaceRelationship{
+						Space: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "space-guid",
+							},
+						},
+					},
+					CreatedAt: now.Add(-26 * 24 * time.Hour),
+				},
+			},
+			opts: Options{
+				NotifyDays:   30,
+				PurgeDays:    25,
+				DisablePurge: true,
+			},
+			timeStartsAt: time.Time{},
 		},
 	}
 	for name, test := range testCases {
@@ -422,9 +497,8 @@ func TestListPurgeSpaces(t *testing.T) {
 				test.spaces,
 				test.apps,
 				test.instances,
+				test.opts,
 				test.now,
-				test.notifyThreshold,
-				test.purgeThreshold,
 				test.timeStartsAt,
 			)
 			if (test.expectedErr == "" && err != nil) || (test.expectedErr != "" && test.expectedErr != err.Error()) {

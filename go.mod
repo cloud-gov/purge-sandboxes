@@ -1,6 +1,6 @@
 module github.com/18f/cg-sandbox
 
-go 1.20
+go 1.22
 
 require (
 	github.com/cloudfoundry-community/go-cfclient/v3 v3.0.0-alpha.6

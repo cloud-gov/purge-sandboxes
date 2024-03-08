@@ -22,6 +22,7 @@ type Options struct {
 	PurgeMailSubject  string `env:"PURGE_MAIL_SUBJECT, required"`
 	DryRun            bool   `env:"DRY_RUN, default=true"`
 	TimeStartsAt      string `env:"TIME_STARTS_AT"`
+	DisablePurge      bool   `env:"DISABLE_PURGE, default=false"`
 	SMTPOptions
 }
 
@@ -78,7 +79,7 @@ func main() {
 			log.Fatalf("error listing org resources for org %s: %s", org.Name, err.Error())
 		}
 
-		toNotify, toPurge, err := listPurgeSpaces(spaces, apps, instances, now, opts.NotifyDays, opts.PurgeDays, timeStartsAt)
+		toNotify, toPurge, err := listPurgeSpaces(spaces, apps, instances, opts, now, timeStartsAt)
 		if err != nil {
 			log.Fatalf("error listing spaces to purge for org %s: %s", org.Name, err.Error())
 		}
