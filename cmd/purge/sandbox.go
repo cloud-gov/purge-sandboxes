@@ -215,9 +215,8 @@ func listPurgeSpaces(
 	spaces []*resource.Space,
 	apps []*resource.App,
 	instances []*resource.ServiceInstance,
+	opts Options,
 	now time.Time,
-	notifyThreshold int,
-	purgeThreshold int,
 	timeStartsAt time.Time,
 ) (
 	toNotify []SpaceDetails,
@@ -239,9 +238,9 @@ func listPurgeSpaces(
 
 		firstResource := firstResource.Truncate(24 * time.Hour)
 		delta := int(now.Sub(firstResource).Hours() / 24)
-		if delta >= purgeThreshold {
+		if !opts.DisablePurge && delta >= opts.PurgeDays {
 			toPurge = append(toPurge, SpaceDetails{firstResource, space})
-		} else if delta >= notifyThreshold {
+		} else if delta >= opts.NotifyDays {
 			toNotify = append(toNotify, SpaceDetails{firstResource, space})
 		}
 	}
