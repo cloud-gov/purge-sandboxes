@@ -117,7 +117,7 @@ resources:
   source:
     commit_verification_keys: ((cloud-gov-pgp-keys))
     uri: https://github.com/cloud-gov/cg-sandbox
-    branch: main
+    branch: fix-go-mod
 
 - name: schedule
   type: cron-resource
