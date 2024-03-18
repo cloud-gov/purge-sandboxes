@@ -32,7 +32,7 @@ func purgeAndRecreateSpace(
 	}
 
 	developers, managers := listSpaceDevsAndManagers(userGUIDs, spaceRoles, spaceUsers)
-	log.Printf("Purging space %s; recipients: %+v, developers: %+v, managers: %+v", details.Space.Name, recipients, developers, managers)
+	log.Printf("Purging space %s; recipients: %+v", details.Space.Name, recipients)
 
 	if opts.DryRun {
 		return nil
