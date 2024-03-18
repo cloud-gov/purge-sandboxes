@@ -8,6 +8,7 @@ import (
 	"github.com/cloudfoundry-community/go-cfclient/v3/client"
 	"github.com/cloudfoundry-community/go-cfclient/v3/resource"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 type mockApplications struct {
@@ -36,8 +37,9 @@ func (a *mockApplications) Delete(ctx context.Context, guid string) (string, err
 }
 
 type spaceCreatedRole struct {
-	UserGUID string
-	RoleType resource.SpaceRoleType
+	SpaceGUID string
+	UserGUID  string
+	RoleType  resource.SpaceRoleType
 }
 
 type mockRoles struct {
@@ -45,17 +47,15 @@ type mockRoles struct {
 	roles             []*resource.Role
 	spaceGUID         string
 	users             []*resource.User
-	createdSpaceRoles map[string]spaceCreatedRole
+	createdSpaceRoles []spaceCreatedRole
 }
 
 func (r *mockRoles) CreateSpaceRole(ctx context.Context, spaceGUID, userGUID string, roleType resource.SpaceRoleType) (*resource.Role, error) {
-	if r.createdSpaceRoles == nil {
-		r.createdSpaceRoles = make(map[string]spaceCreatedRole)
-	}
-	r.createdSpaceRoles[spaceGUID] = spaceCreatedRole{
-		UserGUID: userGUID,
-		RoleType: roleType,
-	}
+	r.createdSpaceRoles = append(r.createdSpaceRoles, spaceCreatedRole{
+		SpaceGUID: spaceGUID,
+		UserGUID:  userGUID,
+		RoleType:  roleType,
+	})
 	return nil, nil
 }
 
@@ -125,7 +125,7 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 		options                 Options
 		organization            *resource.Organization
 		spaceDetails            SpaceDetails
-		expectSpaceCreatedRoles map[string]spaceCreatedRole
+		expectSpaceCreatedRoles []spaceCreatedRole
 	}{
 		"success with one org manager": {
 			cfClient: &cfResourceClient{
@@ -198,10 +198,119 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 					},
 				},
 			},
-			expectSpaceCreatedRoles: map[string]spaceCreatedRole{
-				"space-1-guid": {
-					UserGUID: "user-1",
-					RoleType: resource.SpaceRoleManager,
+			expectSpaceCreatedRoles: []spaceCreatedRole{
+				{
+					SpaceGUID: "space-1-guid",
+					UserGUID:  "user-1",
+					RoleType:  resource.SpaceRoleManager,
+				},
+			},
+		},
+		"success with one org manager and one dev": {
+			cfClient: &cfResourceClient{
+				Applications: &mockApplications{},
+				Roles: &mockRoles{
+					spaceGUID: "space-1-guid",
+					roles: []*resource.Role{
+						{
+							Type: resource.SpaceRoleManager.String(),
+							Relationships: resource.RoleSpaceUserOrganizationRelationships{
+								Space: resource.ToOneRelationship{
+									Data: &resource.Relationship{
+										GUID: "space-1-guid",
+									},
+								},
+								User: resource.ToOneRelationship{
+									Data: &resource.Relationship{
+										GUID: "user-1",
+									},
+								},
+							},
+						},
+						{
+							Type: resource.SpaceRoleDeveloper.String(),
+							Relationships: resource.RoleSpaceUserOrganizationRelationships{
+								Space: resource.ToOneRelationship{
+									Data: &resource.Relationship{
+										GUID: "space-1-guid",
+									},
+								},
+								User: resource.ToOneRelationship{
+									Data: &resource.Relationship{
+										GUID: "user-2",
+									},
+								},
+							},
+						},
+					},
+					users: []*resource.User{
+						{
+							GUID:     "user-1",
+							Username: "foo@bar.gov",
+						},
+						{
+							GUID:     "user-2",
+							Username: "foo2@bar.gov",
+						},
+					},
+				},
+				Spaces: &mockSpaces{
+					spaceGUID: "space-1-guid",
+					users: []*resource.User{
+						{
+							GUID:     "user-1",
+							Username: "foo@bar.gov",
+						},
+						{
+							GUID:     "user-2",
+							Username: "foo2@bar.gov",
+						},
+					},
+					expectedSpaceCreateRequest: &resource.SpaceCreate{
+						Name: "space-1",
+						Relationships: &resource.SpaceRelationships{
+							Organization: &resource.ToOneRelationship{
+								Data: &resource.Relationship{
+									GUID: "org-1",
+								},
+							},
+						},
+					},
+				},
+			},
+			userGUIDs: map[string]bool{
+				"user-1": true,
+				"user-2": true,
+			},
+			options: Options{
+				DryRun: false,
+			},
+			organization: &resource.Organization{
+				GUID: "org-1",
+			},
+			spaceDetails: SpaceDetails{
+				Space: &resource.Space{
+					GUID: "space-1-guid",
+					Name: "space-1",
+					Relationships: &resource.SpaceRelationships{
+						Organization: &resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "org-1",
+							},
+						},
+					},
+				},
+			},
+			expectSpaceCreatedRoles: []spaceCreatedRole{
+				{
+					SpaceGUID: "space-1-guid",
+					UserGUID:  "user-1",
+					RoleType:  resource.SpaceRoleManager,
+				},
+				{
+					SpaceGUID: "space-1-guid",
+					UserGUID:  "user-2",
+					RoleType:  resource.SpaceRoleDeveloper,
 				},
 			},
 		},
@@ -224,7 +333,11 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 			}
 
 			if mockRolesClient, ok := test.cfClient.Roles.(*mockRoles); ok {
-				if !cmp.Equal(mockRolesClient.createdSpaceRoles, test.expectSpaceCreatedRoles) {
+				if !cmp.Equal(
+					mockRolesClient.createdSpaceRoles,
+					test.expectSpaceCreatedRoles,
+					cmpopts.SortSlices(func(a spaceCreatedRole, b spaceCreatedRole) bool { return a.UserGUID < b.UserGUID }),
+				) {
 					t.Fatal(fmt.Errorf(cmp.Diff(mockRolesClient.createdSpaceRoles, test.expectSpaceCreatedRoles)))
 				}
 			}
