@@ -119,95 +119,115 @@ func (m *mockMailSender) sendMail(
 }
 
 func TestPurgeAndRecreateSpace(t *testing.T) {
-	userGUIDs := map[string]bool{
-		"user-1": true,
-	}
-	users := []*resource.User{
-		{
-			GUID:     "user-1",
-			Username: "foo@bar.gov",
-		},
-	}
-	spaceDetails := SpaceDetails{
-		Space: &resource.Space{
-			GUID: "space-1-guid",
-			Name: "space-1",
-			Relationships: &resource.SpaceRelationships{
-				Organization: &resource.ToOneRelationship{
-					Data: &resource.Relationship{
-						GUID: "org-1",
-					},
-				},
-			},
-		},
-	}
-	expectSpaceCreatedRoles := map[string]spaceCreatedRole{
-		"space-1-guid": {
-			UserGUID: "user-1",
-			RoleType: resource.SpaceRoleManager,
-		},
-	}
-
-	mockRolesClient := &mockRoles{
-		spaceGUID: "space-1-guid",
-		roles: []*resource.Role{
-			{
-				Type: resource.SpaceRoleManager.String(),
-				Relationships: resource.RoleSpaceUserOrganizationRelationships{
-					Space: resource.ToOneRelationship{
-						Data: &resource.Relationship{
-							GUID: "space-1-guid",
+	testCases := map[string]struct {
+		cfClient                *cfResourceClient
+		userGUIDs               map[string]bool
+		options                 Options
+		organization            *resource.Organization
+		spaceDetails            SpaceDetails
+		expectSpaceCreatedRoles map[string]spaceCreatedRole
+	}{
+		"success with one org manager": {
+			cfClient: &cfResourceClient{
+				Applications: &mockApplications{},
+				Roles: &mockRoles{
+					spaceGUID: "space-1-guid",
+					roles: []*resource.Role{
+						{
+							Type: resource.SpaceRoleManager.String(),
+							Relationships: resource.RoleSpaceUserOrganizationRelationships{
+								Space: resource.ToOneRelationship{
+									Data: &resource.Relationship{
+										GUID: "space-1-guid",
+									},
+								},
+								User: resource.ToOneRelationship{
+									Data: &resource.Relationship{
+										GUID: "user-1",
+									},
+								},
+							},
 						},
 					},
-					User: resource.ToOneRelationship{
-						Data: &resource.Relationship{
-							GUID: "user-1",
+					users: []*resource.User{
+						{
+							GUID:     "user-1",
+							Username: "foo@bar.gov",
 						},
 					},
 				},
-			},
-		},
-		users: users,
-	}
-
-	cfClient := &cfResourceClient{
-		Applications: &mockApplications{},
-		Roles:        mockRolesClient,
-		Spaces: &mockSpaces{
-			spaceGUID: "space-1-guid",
-			users:     users,
-			expectedSpaceCreateRequest: &resource.SpaceCreate{
-				Name: "space-1",
-				Relationships: &resource.SpaceRelationships{
-					Organization: &resource.ToOneRelationship{
-						Data: &resource.Relationship{
-							GUID: "org-1",
+				Spaces: &mockSpaces{
+					spaceGUID: "space-1-guid",
+					users: []*resource.User{
+						{
+							GUID:     "user-1",
+							Username: "foo@bar.gov",
+						},
+					},
+					expectedSpaceCreateRequest: &resource.SpaceCreate{
+						Name: "space-1",
+						Relationships: &resource.SpaceRelationships{
+							Organization: &resource.ToOneRelationship{
+								Data: &resource.Relationship{
+									GUID: "org-1",
+								},
+							},
 						},
 					},
 				},
 			},
+			userGUIDs: map[string]bool{
+				"user-1": true,
+			},
+			options: Options{
+				DryRun: false,
+			},
+			organization: &resource.Organization{
+				GUID: "org-1",
+			},
+			spaceDetails: SpaceDetails{
+				Space: &resource.Space{
+					GUID: "space-1-guid",
+					Name: "space-1",
+					Relationships: &resource.SpaceRelationships{
+						Organization: &resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "org-1",
+							},
+						},
+					},
+				},
+			},
+			expectSpaceCreatedRoles: map[string]spaceCreatedRole{
+				"space-1-guid": {
+					UserGUID: "user-1",
+					RoleType: resource.SpaceRoleManager,
+				},
+			},
 		},
 	}
 
-	err := purgeAndRecreateSpace(
-		context.Background(),
-		cfClient,
-		Options{
-			DryRun: false,
-		},
-		userGUIDs,
-		&resource.Organization{
-			GUID: "org-1",
-		},
-		spaceDetails,
-		&mockMailSender{},
-	)
+	for name, test := range testCases {
+		t.Run(name, func(t *testing.T) {
+			err := purgeAndRecreateSpace(
+				context.Background(),
+				test.cfClient,
+				test.options,
+				test.userGUIDs,
+				test.organization,
+				test.spaceDetails,
+				&mockMailSender{},
+			)
 
-	if err != nil {
-		t.Fatal(err)
-	}
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	if !cmp.Equal(mockRolesClient.createdSpaceRoles, expectSpaceCreatedRoles) {
-		t.Fatal(fmt.Errorf(cmp.Diff(mockRolesClient.createdSpaceRoles, expectSpaceCreatedRoles)))
+			if mockRolesClient, ok := test.cfClient.Roles.(*mockRoles); ok {
+				if !cmp.Equal(mockRolesClient.createdSpaceRoles, test.expectSpaceCreatedRoles) {
+					t.Fatal(fmt.Errorf(cmp.Diff(mockRolesClient.createdSpaceRoles, test.expectSpaceCreatedRoles)))
+				}
+			}
+		})
 	}
 }
