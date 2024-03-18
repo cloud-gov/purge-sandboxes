@@ -55,8 +55,8 @@ func TestListSpaceDevsAndManagers(t *testing.T) {
 		userGUIDs        map[string]bool
 		roles            []*resource.Role
 		users            []*resource.User
-		expectedDevs     []string
-		expectedManagers []string
+		expectedDevs     []spaceUser
+		expectedManagers []spaceUser
 		expectedErr      string
 	}{
 		"returns correct devs and managers": {
@@ -106,8 +106,22 @@ func TestListSpaceDevsAndManagers(t *testing.T) {
 					},
 				},
 			},
-			expectedDevs:     []string{"foo1@bar.gov", "foo2@bar.gov"},
-			expectedManagers: []string{"foo1@bar.gov"},
+			expectedDevs: []spaceUser{
+				{
+					GUID:     "user-1",
+					Username: "foo1@bar.gov",
+				},
+				{
+					GUID:     "user-2",
+					Username: "foo2@bar.gov",
+				},
+			},
+			expectedManagers: []spaceUser{
+				{
+					GUID:     "user-1",
+					Username: "foo1@bar.gov",
+				},
+			},
 		},
 		"skips users not in user GUIDs map": {
 			userGUIDs: map[string]bool{
@@ -145,8 +159,13 @@ func TestListSpaceDevsAndManagers(t *testing.T) {
 					},
 				},
 			},
-			expectedDevs:     []string{"foo1@bar.gov"},
-			expectedManagers: []string{},
+			expectedDevs: []spaceUser{
+				{
+					GUID:     "user-1",
+					Username: "foo1@bar.gov",
+				},
+			},
+			expectedManagers: []spaceUser{},
 		},
 		"skips users without username": {
 			userGUIDs: map[string]bool{
@@ -181,8 +200,13 @@ func TestListSpaceDevsAndManagers(t *testing.T) {
 					},
 				},
 			},
-			expectedDevs:     []string{"foo1@bar.gov"},
-			expectedManagers: []string{},
+			expectedDevs: []spaceUser{
+				{
+					GUID:     "user-1",
+					Username: "foo1@bar.gov",
+				},
+			},
+			expectedManagers: []spaceUser{},
 		},
 	}
 	for name, test := range testCases {

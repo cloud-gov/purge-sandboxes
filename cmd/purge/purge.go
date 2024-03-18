@@ -32,13 +32,13 @@ func purgeAndRecreateSpace(
 	}
 
 	developers, managers := listSpaceDevsAndManagers(userGUIDs, spaceRoles, spaceUsers)
-	log.Printf("Purging space %s; recipients: %+v, developers: %+v, managers: %+v", details.Space.Name, recipients, developers, managers)
+	log.Printf("Purging space %s; recipients: %+v", details.Space.Name, recipients)
 
 	if opts.DryRun {
 		return nil
 	}
 
-	if err := sendPurgeEmail(ctx, cfClient, opts, org, details, recipients, mailSender); err != nil {
+	if err := sendPurgeEmail(opts, org, details, recipients, mailSender); err != nil {
 		return fmt.Errorf("error sending purge notification email for space %s in org %s: %w", details.Space.Name, org.Name, err)
 	}
 
@@ -52,8 +52,7 @@ func purgeAndRecreateSpace(
 			Name:          details.Space.Name,
 			Relationships: details.Space.Relationships,
 		}
-		log.Printf("recreating space: %+v", spaceRequest)
-		if _, err := cfClient.Spaces.Create(ctx, &resource.SpaceCreate{}); err != nil {
+		if _, err := cfClient.Spaces.Create(ctx, spaceRequest); err != nil {
 			return fmt.Errorf("error recreating space %s in org %s: %w", details.Space.Name, org.Name, err)
 		}
 		log.Printf("recreating space roles")
@@ -66,8 +65,6 @@ func purgeAndRecreateSpace(
 }
 
 func sendPurgeEmail(
-	ctx context.Context,
-	cfClient *cfResourceClient,
 	opts Options,
 	org *resource.Organization,
 	details SpaceDetails,
