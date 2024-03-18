@@ -11,6 +11,11 @@ import (
 	"github.com/cloudfoundry-community/go-cfclient/v3/resource"
 )
 
+type spaceUser struct {
+	GUID     string
+	Username string
+}
+
 // listRecipients get a list of recipient emails from space users
 func listRecipients(
 	userGUIDs map[string]bool,
@@ -34,9 +39,9 @@ func listSpaceDevsAndManagers(
 	userGUIDs map[string]bool,
 	spaceRoles []*resource.Role,
 	spaceUsers []*resource.User,
-) (developers []string, managers []string) {
-	developers = []string{}
-	managers = []string{}
+) (developers []spaceUser, managers []spaceUser) {
+	developers = []spaceUser{}
+	managers = []spaceUser{}
 	var usernamesMap map[string]string
 
 	for _, role := range spaceRoles {
@@ -66,9 +71,15 @@ func listSpaceDevsAndManagers(
 		}
 
 		if role.Type == resource.SpaceRoleDeveloper.String() {
-			developers = append(developers, username)
+			developers = append(developers, spaceUser{
+				GUID:     roleUserGUID,
+				Username: username,
+			})
 		} else if role.Type == resource.SpaceRoleManager.String() {
-			managers = append(managers, username)
+			managers = append(managers, spaceUser{
+				GUID:     roleUserGUID,
+				Username: username,
+			})
 		}
 	}
 	return
@@ -78,17 +89,17 @@ func recreateSpaceDevsAndManagers(
 	ctx context.Context,
 	cfClient *cfResourceClient,
 	spaceGUID string,
-	developers []string,
-	managers []string,
+	developers []spaceUser,
+	managers []spaceUser,
 ) error {
-	for _, developerGUID := range developers {
-		_, err := cfClient.Roles.CreateSpaceRole(ctx, spaceGUID, developerGUID, resource.SpaceRoleDeveloper)
+	for _, developer := range developers {
+		_, err := cfClient.Roles.CreateSpaceRole(ctx, spaceGUID, developer.GUID, resource.SpaceRoleDeveloper)
 		if err != nil {
 			return err
 		}
 	}
-	for _, managerGUID := range managers {
-		_, err := cfClient.Roles.CreateSpaceRole(ctx, spaceGUID, managerGUID, resource.SpaceRoleManager)
+	for _, manager := range managers {
+		_, err := cfClient.Roles.CreateSpaceRole(ctx, spaceGUID, manager.GUID, resource.SpaceRoleManager)
 		if err != nil {
 			return err
 		}

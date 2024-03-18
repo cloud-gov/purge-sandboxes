@@ -35,14 +35,27 @@ func (a *mockApplications) Delete(ctx context.Context, guid string) (string, err
 	return "", nil
 }
 
+type spaceCreatedRole struct {
+	UserGUID string
+	RoleType resource.SpaceRoleType
+}
+
 type mockRoles struct {
-	listRolesErr error
-	roles        []*resource.Role
-	spaceGUID    string
-	users        []*resource.User
+	listRolesErr      error
+	roles             []*resource.Role
+	spaceGUID         string
+	users             []*resource.User
+	createdSpaceRoles map[string]spaceCreatedRole
 }
 
 func (r *mockRoles) CreateSpaceRole(ctx context.Context, spaceGUID, userGUID string, roleType resource.SpaceRoleType) (*resource.Role, error) {
+	if r.createdSpaceRoles == nil {
+		r.createdSpaceRoles = make(map[string]spaceCreatedRole)
+	}
+	r.createdSpaceRoles[spaceGUID] = spaceCreatedRole{
+		UserGUID: userGUID,
+		RoleType: roleType,
+	}
 	return nil, nil
 }
 
@@ -128,47 +141,57 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 			},
 		},
 	}
+	expectSpaceCreatedRoles := map[string]spaceCreatedRole{
+		"space-1-guid": {
+			UserGUID: "user-1",
+			RoleType: resource.SpaceRoleManager,
+		},
+	}
 
-	err := purgeAndRecreateSpace(
-		context.Background(),
-		&cfResourceClient{
-			Applications: &mockApplications{},
-			Roles: &mockRoles{
-				spaceGUID: "space-1-guid",
-				roles: []*resource.Role{
-					{
-						Type: resource.SpaceRoleManager.String(),
-						Relationships: resource.RoleSpaceUserOrganizationRelationships{
-							Space: resource.ToOneRelationship{
-								Data: &resource.Relationship{
-									GUID: "space-1-guid",
-								},
-							},
-							User: resource.ToOneRelationship{
-								Data: &resource.Relationship{
-									GUID: "user-1",
-								},
-							},
+	mockRolesClient := &mockRoles{
+		spaceGUID: "space-1-guid",
+		roles: []*resource.Role{
+			{
+				Type: resource.SpaceRoleManager.String(),
+				Relationships: resource.RoleSpaceUserOrganizationRelationships{
+					Space: resource.ToOneRelationship{
+						Data: &resource.Relationship{
+							GUID: "space-1-guid",
 						},
 					},
-				},
-				users: users,
-			},
-			Spaces: &mockSpaces{
-				spaceGUID: "space-1-guid",
-				users:     users,
-				expectedSpaceCreateRequest: &resource.SpaceCreate{
-					Name: "space-1",
-					Relationships: &resource.SpaceRelationships{
-						Organization: &resource.ToOneRelationship{
-							Data: &resource.Relationship{
-								GUID: "org-1",
-							},
+					User: resource.ToOneRelationship{
+						Data: &resource.Relationship{
+							GUID: "user-1",
 						},
 					},
 				},
 			},
 		},
+		users: users,
+	}
+
+	cfClient := &cfResourceClient{
+		Applications: &mockApplications{},
+		Roles:        mockRolesClient,
+		Spaces: &mockSpaces{
+			spaceGUID: "space-1-guid",
+			users:     users,
+			expectedSpaceCreateRequest: &resource.SpaceCreate{
+				Name: "space-1",
+				Relationships: &resource.SpaceRelationships{
+					Organization: &resource.ToOneRelationship{
+						Data: &resource.Relationship{
+							GUID: "org-1",
+						},
+					},
+				},
+			},
+		},
+	}
+
+	err := purgeAndRecreateSpace(
+		context.Background(),
+		cfClient,
 		Options{
 			DryRun: false,
 		},
@@ -182,5 +205,9 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if !cmp.Equal(mockRolesClient.createdSpaceRoles, expectSpaceCreatedRoles) {
+		t.Fatal(fmt.Errorf(cmp.Diff(mockRolesClient.createdSpaceRoles, expectSpaceCreatedRoles)))
 	}
 }
