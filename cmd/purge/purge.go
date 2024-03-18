@@ -38,7 +38,7 @@ func purgeAndRecreateSpace(
 		return nil
 	}
 
-	if err := sendPurgeEmail(ctx, cfClient, opts, org, details, recipients, mailSender); err != nil {
+	if err := sendPurgeEmail(opts, org, details, recipients, mailSender); err != nil {
 		return fmt.Errorf("error sending purge notification email for space %s in org %s: %w", details.Space.Name, org.Name, err)
 	}
 
@@ -65,8 +65,6 @@ func purgeAndRecreateSpace(
 }
 
 func sendPurgeEmail(
-	ctx context.Context,
-	cfClient *cfResourceClient,
 	opts Options,
 	org *resource.Organization,
 	details SpaceDetails,
