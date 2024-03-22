@@ -106,7 +106,8 @@ func recreateSpace(
 				"error finding quota %s for space %s in org %s: %w",
 				options.SandboxQuotaName,
 				details.Space.Name,
-				organization.Name, err,
+				organization.Name,
+				err,
 			)
 		}
 		if spaceQuota != nil {
