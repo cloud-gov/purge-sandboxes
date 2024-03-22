@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/mail"
 	"strings"
@@ -83,6 +84,47 @@ func listSpaceDevsAndManagers(
 		}
 	}
 	return
+}
+
+func recreateSpace(
+	ctx context.Context,
+	cfClient *cfResourceClient,
+	options Options,
+	organization *resource.Organization,
+	details SpaceDetails,
+) error {
+	spaceRequest := &resource.SpaceCreate{
+		Name:          details.Space.Name,
+		Relationships: details.Space.Relationships,
+	}
+	if spaceRequest.Relationships.Quota == nil {
+		spaceQuotaListOptions := client.NewSpaceQuotaListOptions()
+		spaceQuotaListOptions.OrganizationGUIDs.EqualTo(organization.GUID)
+		if options.SandboxQuotaName != "" {
+			spaceQuotaListOptions.Names.EqualTo(options.SandboxQuotaName)
+		}
+		spaceQuota, err := cfClient.SpaceQuotas.Single(ctx, spaceQuotaListOptions)
+		if err != nil {
+			return fmt.Errorf(
+				"error finding quota %s for space %s in org %s: %w",
+				options.SandboxQuotaName,
+				details.Space.Name,
+				organization.Name,
+				err,
+			)
+		}
+		if spaceQuota != nil {
+			spaceRequest.Relationships.Quota = &resource.ToOneRelationship{
+				Data: &resource.Relationship{
+					GUID: spaceQuota.GUID,
+				},
+			}
+		}
+	}
+	if _, err := cfClient.Spaces.Create(ctx, spaceRequest); err != nil {
+		return fmt.Errorf("error creating space %s in org %s: %w", details.Space.Name, organization.Name, err)
+	}
+	return nil
 }
 
 func recreateSpaceDevsAndManagers(

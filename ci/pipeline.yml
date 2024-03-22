@@ -48,7 +48,7 @@ jobs:
   - task: purge
     file: sandbox-source/ci/purge.yml
     image: general-task
-    params:
+    params: &purge-params
       API_ADDRESS: ((staging-cf-api-url))
       CLIENT_ID: ((client-id-staging))
       CLIENT_SECRET: ((client-secret-staging))
@@ -66,6 +66,7 @@ jobs:
       TIME_STARTS_AT: ((time-starts-at-staging))
       DRY_RUN: ((dry-run-staging))
       DISABLE_PURGE: ((disable-purge-staging))
+      SANDBOX_QUOTA_NAME: ((sandbox-quota-name))
   on_failure:
     put: slack
     params:
@@ -93,20 +94,10 @@ jobs:
     file: sandbox-source/ci/purge.yml
     image: general-task
     params:
+      <<: *purge-params
       API_ADDRESS: ((prod-cf-api-url))
       CLIENT_ID: ((client-id-production))
       CLIENT_SECRET: ((client-secret-production))
-      ORG_PREFIX: ((org-prefix))
-      NOTIFY_DAYS: ((notify-days))
-      PURGE_DAYS: ((purge-days))
-      NOTIFY_MAIL_SUBJECT: ((notify-subject))
-      PURGE_MAIL_SUBJECT: ((purge-subject))
-      SMTP_HOST: ((smtp-host))
-      SMTP_USER: ((smtp-user))
-      SMTP_PASS: ((smtp-pass))
-      SMTP_PORT: ((smtp-port))
-      SMTP_CERT: ((smtp-cert))
-      MAIL_SENDER: ((smtp-from))
       TIME_STARTS_AT: ((time-starts-at-production))
       DRY_RUN: ((dry-run-production))
       DISABLE_PURGE: ((disable-purge-production))

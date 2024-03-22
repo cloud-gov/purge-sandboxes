@@ -48,11 +48,8 @@ func purgeAndRecreateSpace(
 	}
 
 	if len(developers) > 0 || len(managers) > 0 {
-		spaceRequest := &resource.SpaceCreate{
-			Name:          details.Space.Name,
-			Relationships: details.Space.Relationships,
-		}
-		if _, err := cfClient.Spaces.Create(ctx, spaceRequest); err != nil {
+		log.Printf("recreating space %s", details.Space.Name)
+		if err := recreateSpace(ctx, cfClient, opts, org, details); err != nil {
 			return fmt.Errorf("error recreating space %s in org %s: %w", details.Space.Name, org.Name, err)
 		}
 		log.Printf("recreating space roles")

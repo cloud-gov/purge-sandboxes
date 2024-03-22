@@ -23,6 +23,7 @@ type Options struct {
 	DryRun            bool   `env:"DRY_RUN, default=true"`
 	TimeStartsAt      string `env:"TIME_STARTS_AT"`
 	DisablePurge      bool   `env:"DISABLE_PURGE, default=false"`
+	SandboxQuotaName  string `env:"SANDBOX_QUOTA_NAME, required"`
 	SMTPOptions
 }
 

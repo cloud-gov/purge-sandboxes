@@ -97,13 +97,33 @@ func (s *mockSpaces) ListAll(ctx context.Context, opts *client.SpaceListOptions)
 
 func (s *mockSpaces) Create(ctx context.Context, r *resource.SpaceCreate) (*resource.Space, error) {
 	if !cmp.Equal(r, s.expectedSpaceCreateRequest) {
-		return nil, fmt.Errorf(cmp.Diff(r, s.expectedSpaceCreateRequest))
+		return nil, fmt.Errorf("expected creation params do not match: %s", cmp.Diff(r, s.expectedSpaceCreateRequest))
 	}
 	return nil, nil
 }
 
 func (s *mockSpaces) Delete(ctx context.Context, guid string) (string, error) {
 	return "", nil
+}
+
+type mockSpaceQuotas struct {
+	spaceQuotaName string
+	orgGUID        string
+	quota          *resource.SpaceQuota
+}
+
+func (q *mockSpaceQuotas) Single(ctx context.Context, opts *client.SpaceQuotaListOptions) (*resource.SpaceQuota, error) {
+	expectedOptions := client.NewSpaceQuotaListOptions()
+	if q.spaceQuotaName != "" {
+		expectedOptions.Names.EqualTo(q.spaceQuotaName)
+	}
+	if q.orgGUID != "" {
+		expectedOptions.OrganizationGUIDs.EqualTo(q.orgGUID)
+	}
+	if !cmp.Equal(opts, expectedOptions) {
+		return nil, fmt.Errorf(cmp.Diff(opts, expectedOptions))
+	}
+	return q.quota, nil
 }
 
 type mockMailSender struct{}
@@ -175,12 +195,17 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 						},
 					},
 				},
+				SpaceQuotas: &mockSpaceQuotas{
+					orgGUID:        "org-1",
+					spaceQuotaName: "quota-1",
+				},
 			},
 			userGUIDs: map[string]bool{
 				"user-1": true,
 			},
 			options: Options{
-				DryRun: false,
+				DryRun:           false,
+				SandboxQuotaName: "quota-1",
 			},
 			organization: &resource.Organization{
 				GUID: "org-1",
@@ -277,13 +302,140 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 						},
 					},
 				},
+				SpaceQuotas: &mockSpaceQuotas{
+					orgGUID:        "org-1",
+					spaceQuotaName: "quota-1",
+				},
 			},
 			userGUIDs: map[string]bool{
 				"user-1": true,
 				"user-2": true,
 			},
 			options: Options{
-				DryRun: false,
+				DryRun:           false,
+				SandboxQuotaName: "quota-1",
+			},
+			organization: &resource.Organization{
+				GUID: "org-1",
+			},
+			spaceDetails: SpaceDetails{
+				Space: &resource.Space{
+					GUID: "space-1-guid",
+					Name: "space-1",
+					Relationships: &resource.SpaceRelationships{
+						Organization: &resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "org-1",
+							},
+						},
+					},
+				},
+			},
+			expectSpaceCreatedRoles: []spaceCreatedRole{
+				{
+					SpaceGUID: "space-1-guid",
+					UserGUID:  "user-1",
+					RoleType:  resource.SpaceRoleManager,
+				},
+				{
+					SpaceGUID: "space-1-guid",
+					UserGUID:  "user-2",
+					RoleType:  resource.SpaceRoleDeveloper,
+				},
+			},
+		},
+		"success with space quota found": {
+			cfClient: &cfResourceClient{
+				Applications: &mockApplications{},
+				Roles: &mockRoles{
+					spaceGUID: "space-1-guid",
+					roles: []*resource.Role{
+						{
+							Type: resource.SpaceRoleManager.String(),
+							Relationships: resource.RoleSpaceUserOrganizationRelationships{
+								Space: resource.ToOneRelationship{
+									Data: &resource.Relationship{
+										GUID: "space-1-guid",
+									},
+								},
+								User: resource.ToOneRelationship{
+									Data: &resource.Relationship{
+										GUID: "user-1",
+									},
+								},
+							},
+						},
+						{
+							Type: resource.SpaceRoleDeveloper.String(),
+							Relationships: resource.RoleSpaceUserOrganizationRelationships{
+								Space: resource.ToOneRelationship{
+									Data: &resource.Relationship{
+										GUID: "space-1-guid",
+									},
+								},
+								User: resource.ToOneRelationship{
+									Data: &resource.Relationship{
+										GUID: "user-2",
+									},
+								},
+							},
+						},
+					},
+					users: []*resource.User{
+						{
+							GUID:     "user-1",
+							Username: "foo@bar.gov",
+						},
+						{
+							GUID:     "user-2",
+							Username: "foo2@bar.gov",
+						},
+					},
+				},
+				Spaces: &mockSpaces{
+					spaceGUID: "space-1-guid",
+					users: []*resource.User{
+						{
+							GUID:     "user-1",
+							Username: "foo@bar.gov",
+						},
+						{
+							GUID:     "user-2",
+							Username: "foo2@bar.gov",
+						},
+					},
+					expectedSpaceCreateRequest: &resource.SpaceCreate{
+						Name: "space-1",
+						Relationships: &resource.SpaceRelationships{
+							Organization: &resource.ToOneRelationship{
+								Data: &resource.Relationship{
+									GUID: "org-1",
+								},
+							},
+							Quota: &resource.ToOneRelationship{
+								Data: &resource.Relationship{
+									GUID: "quota-guid-1",
+								},
+							},
+						},
+					},
+				},
+				SpaceQuotas: &mockSpaceQuotas{
+					spaceQuotaName: "quota-1",
+					orgGUID:        "org-1",
+					quota: &resource.SpaceQuota{
+						Name: "quota-1",
+						GUID: "quota-guid-1",
+					},
+				},
+			},
+			userGUIDs: map[string]bool{
+				"user-1": true,
+				"user-2": true,
+			},
+			options: Options{
+				DryRun:           false,
+				SandboxQuotaName: "quota-1",
 			},
 			organization: &resource.Organization{
 				GUID: "org-1",
