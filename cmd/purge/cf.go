@@ -33,6 +33,10 @@ type SpacesClient interface {
 	Delete(ctx context.Context, guid string) (string, error)
 }
 
+type SpaceQuotasClient interface {
+	Single(ctx context.Context, opts *client.SpaceQuotaListOptions) (*resource.SpaceQuota, error)
+}
+
 type UsersClient interface {
 	ListAll(ctx context.Context, opts *client.UserListOptions) ([]*resource.User, error)
 }
@@ -43,6 +47,7 @@ type cfResourceClient struct {
 	Roles            RolesClient
 	ServiceInstances ServiceInstancesClient
 	Spaces           SpacesClient
+	SpaceQuotas      SpaceQuotasClient
 	Users            UsersClient
 }
 
@@ -69,6 +74,7 @@ func newCFClient(
 		Roles:            cf.Roles,
 		ServiceInstances: cf.ServiceInstances,
 		Spaces:           cf.Spaces,
+		SpaceQuotas:      cf.SpaceQuotas,
 		Users:            cf.Users,
 	}, nil
 }

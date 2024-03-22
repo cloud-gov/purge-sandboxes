@@ -106,6 +106,12 @@ func (s *mockSpaces) Delete(ctx context.Context, guid string) (string, error) {
 	return "", nil
 }
 
+type mockSpaceQuotas struct{}
+
+func (q *mockSpaceQuotas) Single(ctx context.Context, opts *client.SpaceQuotaListOptions) (*resource.SpaceQuota, error) {
+	return nil, nil
+}
+
 type mockMailSender struct{}
 
 func (m *mockMailSender) sendMail(
@@ -175,6 +181,7 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 						},
 					},
 				},
+				SpaceQuotas: &mockSpaceQuotas{},
 			},
 			userGUIDs: map[string]bool{
 				"user-1": true,
@@ -277,6 +284,7 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 						},
 					},
 				},
+				SpaceQuotas: &mockSpaceQuotas{},
 			},
 			userGUIDs: map[string]bool{
 				"user-1": true,
