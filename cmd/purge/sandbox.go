@@ -110,11 +110,15 @@ func recreateSpace(
 			)
 		}
 		if spaceQuota != nil {
-			spaceRequest.Relationships.Quota.Data.GUID = spaceQuota.GUID
+			spaceRequest.Relationships.Quota = &resource.ToOneRelationship{
+				Data: &resource.Relationship{
+					GUID: spaceQuota.GUID,
+				},
+			}
 		}
 	}
 	if _, err := cfClient.Spaces.Create(ctx, spaceRequest); err != nil {
-		return fmt.Errorf("error recreating space %s in org %s: %w", details.Space.Name, organization.Name, err)
+		return fmt.Errorf("error creating space %s in org %s: %w", details.Space.Name, organization.Name, err)
 	}
 	return nil
 }

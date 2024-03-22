@@ -50,7 +50,7 @@ func purgeAndRecreateSpace(
 	if len(developers) > 0 || len(managers) > 0 {
 		log.Printf("recreating space %s", details.Space.Name)
 		if err := recreateSpace(ctx, cfClient, opts, org, details); err != nil {
-			return fmt.Errorf("error recreating space developers/managers for space %s in org %s: %w", details.Space.Name, org.Name, err)
+			return fmt.Errorf("error recreating space %s in org %s: %w", details.Space.Name, org.Name, err)
 		}
 		log.Printf("recreating space roles")
 		if err := recreateSpaceDevsAndManagers(ctx, cfClient, details.Space.GUID, developers, managers); err != nil {
