@@ -108,13 +108,20 @@ func (s *mockSpaces) Delete(ctx context.Context, guid string) (string, error) {
 
 type mockSpaceQuotas struct {
 	spaceQuotaName string
+	orgGUID        string
 	quota          *resource.SpaceQuota
 }
 
 func (q *mockSpaceQuotas) Single(ctx context.Context, opts *client.SpaceQuotaListOptions) (*resource.SpaceQuota, error) {
-	expectedNameFilters := []string{q.spaceQuotaName}
-	if !cmp.Equal(opts.Names.Values, expectedNameFilters) {
-		return nil, fmt.Errorf(cmp.Diff(opts.Names.Values, expectedNameFilters))
+	expectedOptions := client.NewSpaceQuotaListOptions()
+	if q.spaceQuotaName != "" {
+		expectedOptions.Names.EqualTo(q.spaceQuotaName)
+	}
+	if q.orgGUID != "" {
+		expectedOptions.OrganizationGUIDs.EqualTo(q.orgGUID)
+	}
+	if !cmp.Equal(opts, expectedOptions) {
+		return nil, fmt.Errorf(cmp.Diff(opts, expectedOptions))
 	}
 	return q.quota, nil
 }
@@ -188,13 +195,17 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 						},
 					},
 				},
-				SpaceQuotas: &mockSpaceQuotas{},
+				SpaceQuotas: &mockSpaceQuotas{
+					orgGUID:        "org-1",
+					spaceQuotaName: "quota-1",
+				},
 			},
 			userGUIDs: map[string]bool{
 				"user-1": true,
 			},
 			options: Options{
-				DryRun: false,
+				DryRun:           false,
+				SandboxQuotaName: "quota-1",
 			},
 			organization: &resource.Organization{
 				GUID: "org-1",
@@ -291,14 +302,18 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 						},
 					},
 				},
-				SpaceQuotas: &mockSpaceQuotas{},
+				SpaceQuotas: &mockSpaceQuotas{
+					orgGUID:        "org-1",
+					spaceQuotaName: "quota-1",
+				},
 			},
 			userGUIDs: map[string]bool{
 				"user-1": true,
 				"user-2": true,
 			},
 			options: Options{
-				DryRun: false,
+				DryRun:           false,
+				SandboxQuotaName: "quota-1",
 			},
 			organization: &resource.Organization{
 				GUID: "org-1",
@@ -407,6 +422,7 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 				},
 				SpaceQuotas: &mockSpaceQuotas{
 					spaceQuotaName: "quota-1",
+					orgGUID:        "org-1",
 					quota: &resource.SpaceQuota{
 						Name: "quota-1",
 						GUID: "quota-guid-1",

@@ -99,7 +99,10 @@ func recreateSpace(
 	}
 	if spaceRequest.Relationships.Quota == nil {
 		spaceQuotaListOptions := client.NewSpaceQuotaListOptions()
-		spaceQuotaListOptions.Names.EqualTo(options.SandboxQuotaName)
+		spaceQuotaListOptions.OrganizationGUIDs.EqualTo(organization.GUID)
+		if options.SandboxQuotaName != "" {
+			spaceQuotaListOptions.Names.EqualTo(options.SandboxQuotaName)
+		}
 		spaceQuota, err := cfClient.SpaceQuotas.Single(ctx, spaceQuotaListOptions)
 		if err != nil {
 			return fmt.Errorf(
