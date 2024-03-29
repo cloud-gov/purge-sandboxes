@@ -35,6 +35,7 @@ type SpacesClient interface {
 
 type SpaceQuotasClient interface {
 	Single(ctx context.Context, opts *client.SpaceQuotaListOptions) (*resource.SpaceQuota, error)
+	Apply(ctx context.Context, guid string, spaceGUIDs []string) ([]string, error)
 }
 
 type UsersClient interface {

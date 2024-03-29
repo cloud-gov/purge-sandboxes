@@ -79,6 +79,7 @@ type mockSpaces struct {
 	users                      []*resource.User
 	spaceGUID                  string
 	expectedSpaceCreateRequest *resource.SpaceCreate
+	space                      *resource.Space
 }
 
 func (s *mockSpaces) ListUsersAll(ctx context.Context, spaceGUID string, opts *client.UserListOptions) ([]*resource.User, error) {
@@ -99,7 +100,7 @@ func (s *mockSpaces) Create(ctx context.Context, r *resource.SpaceCreate) (*reso
 	if !cmp.Equal(r, s.expectedSpaceCreateRequest) {
 		return nil, fmt.Errorf("expected creation params do not match: %s", cmp.Diff(r, s.expectedSpaceCreateRequest))
 	}
-	return nil, nil
+	return s.space, nil
 }
 
 func (s *mockSpaces) Delete(ctx context.Context, guid string) (string, error) {
@@ -124,6 +125,10 @@ func (q *mockSpaceQuotas) Single(ctx context.Context, opts *client.SpaceQuotaLis
 		return nil, fmt.Errorf(cmp.Diff(opts, expectedOptions))
 	}
 	return q.quota, nil
+}
+
+func (q *mockSpaceQuotas) Apply(ctx context.Context, guid string, spaceGUIDs []string) ([]string, error) {
+	return []string{}, nil
 }
 
 type mockMailSender struct{}
@@ -194,10 +199,17 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 							},
 						},
 					},
+					space: &resource.Space{
+						GUID: "space-1-guid",
+						Name: "space-1",
+					},
 				},
 				SpaceQuotas: &mockSpaceQuotas{
 					orgGUID:        "org-1",
 					spaceQuotaName: "quota-1",
+					quota: &resource.SpaceQuota{
+						GUID: "quota-guid-1",
+					},
 				},
 			},
 			userGUIDs: map[string]bool{
@@ -301,10 +313,17 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 							},
 						},
 					},
+					space: &resource.Space{
+						GUID: "space-1-guid",
+						Name: "space-1",
+					},
 				},
 				SpaceQuotas: &mockSpaceQuotas{
 					orgGUID:        "org-1",
 					spaceQuotaName: "quota-1",
+					quota: &resource.SpaceQuota{
+						GUID: "quota-guid-1",
+					},
 				},
 			},
 			userGUIDs: map[string]bool{
@@ -412,12 +431,11 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 									GUID: "org-1",
 								},
 							},
-							Quota: &resource.ToOneRelationship{
-								Data: &resource.Relationship{
-									GUID: "quota-guid-1",
-								},
-							},
 						},
+					},
+					space: &resource.Space{
+						GUID: "space-1-guid",
+						Name: "space-1",
 					},
 				},
 				SpaceQuotas: &mockSpaceQuotas{
@@ -448,6 +466,11 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 						Organization: &resource.ToOneRelationship{
 							Data: &resource.Relationship{
 								GUID: "org-1",
+							},
+						},
+						Quota: &resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "quota-1-guid",
 							},
 						},
 					},
