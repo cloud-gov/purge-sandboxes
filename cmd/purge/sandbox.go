@@ -97,7 +97,6 @@ func recreateSpace(
 		Name:          details.Space.Name,
 		Relationships: details.Space.Relationships,
 	}
-	var spaceQuotaGUID string
 
 	if spaceRequest.Relationships.Quota != nil {
 		spaceRequest.Relationships.Quota = nil
@@ -118,13 +117,12 @@ func recreateSpace(
 			err,
 		)
 	}
-	spaceQuotaGUID = spaceQuota.GUID
 
 	space, err := cfClient.Spaces.Create(ctx, spaceRequest)
 	if err != nil {
 		return fmt.Errorf("error creating space %s in org %s: %w", details.Space.Name, organization.Name, err)
 	}
-	_, err = cfClient.SpaceQuotas.Apply(ctx, spaceQuotaGUID, []string{space.GUID})
+	_, err = cfClient.SpaceQuotas.Apply(ctx, spaceQuota.GUID, []string{space.GUID})
 	if err != nil {
 		return fmt.Errorf("error applying space quota %s to space %s: %w", options.SandboxQuotaName, details.Space.Name, err)
 	}
