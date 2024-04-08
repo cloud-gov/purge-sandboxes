@@ -97,32 +97,34 @@ func recreateSpace(
 		Name:          details.Space.Name,
 		Relationships: details.Space.Relationships,
 	}
-	if spaceRequest.Relationships.Quota == nil {
-		spaceQuotaListOptions := client.NewSpaceQuotaListOptions()
-		spaceQuotaListOptions.OrganizationGUIDs.EqualTo(organization.GUID)
-		if options.SandboxQuotaName != "" {
-			spaceQuotaListOptions.Names.EqualTo(options.SandboxQuotaName)
-		}
-		spaceQuota, err := cfClient.SpaceQuotas.Single(ctx, spaceQuotaListOptions)
-		if err != nil {
-			return fmt.Errorf(
-				"error finding quota %s for space %s in org %s: %w",
-				options.SandboxQuotaName,
-				details.Space.Name,
-				organization.Name,
-				err,
-			)
-		}
-		if spaceQuota != nil {
-			spaceRequest.Relationships.Quota = &resource.ToOneRelationship{
-				Data: &resource.Relationship{
-					GUID: spaceQuota.GUID,
-				},
-			}
-		}
+
+	if spaceRequest.Relationships.Quota != nil {
+		spaceRequest.Relationships.Quota = nil
 	}
-	if _, err := cfClient.Spaces.Create(ctx, spaceRequest); err != nil {
+
+	spaceQuotaListOptions := client.NewSpaceQuotaListOptions()
+	spaceQuotaListOptions.OrganizationGUIDs.EqualTo(organization.GUID)
+	if options.SandboxQuotaName != "" {
+		spaceQuotaListOptions.Names.EqualTo(options.SandboxQuotaName)
+	}
+	spaceQuota, err := cfClient.SpaceQuotas.Single(ctx, spaceQuotaListOptions)
+	if err != nil {
+		return fmt.Errorf(
+			"error finding quota %s for space %s in org %s: %w",
+			options.SandboxQuotaName,
+			details.Space.Name,
+			organization.Name,
+			err,
+		)
+	}
+
+	space, err := cfClient.Spaces.Create(ctx, spaceRequest)
+	if err != nil {
 		return fmt.Errorf("error creating space %s in org %s: %w", details.Space.Name, organization.Name, err)
+	}
+	_, err = cfClient.SpaceQuotas.Apply(ctx, spaceQuota.GUID, []string{space.GUID})
+	if err != nil {
+		return fmt.Errorf("error applying space quota %s to space %s: %w", options.SandboxQuotaName, details.Space.Name, err)
 	}
 	return nil
 }
