@@ -48,29 +48,19 @@ func purgeAndRecreateSpace(
 		return fmt.Errorf("error purging space %s in org %s: %w", details.Space.Name, org.Name, err)
 	}
 
-	space, err := getSpace(ctx, cfClient, org, details)
-	for space != nil {
-		if err != nil {
-			return fmt.Errorf("error verifying deletion of space %s in org %s: %w", details.Space.Name, org.Name, err)
-		}
-		log.Printf("space still exists: %s", space.GUID)
-		space, err = getSpace(ctx, cfClient, org, details)
-		time.Sleep(100 * time.Millisecond)
+	err = waitUntilSpaceIsFullyDeleted(ctx, cfClient, org, details)
+	if err != nil {
+		return fmt.Errorf("error waiting until space %s in org %s is deleted: %w", details.Space.Name, org.Name, err)
 	}
 
 	log.Printf("recreating space %s", details.Space.Name)
-	if err := recreateSpace(ctx, cfClient, opts, org, details); err != nil {
+	space, err := recreateSpace(ctx, cfClient, opts, org, details)
+	if err != nil {
 		return fmt.Errorf("error recreating space %s in org %s: %w", details.Space.Name, org.Name, err)
 	}
 
 	if len(developers) > 0 || len(managers) > 0 {
-		space, err = getSpace(ctx, cfClient, org, details)
-		if err != nil {
-			return fmt.Errorf("error verifying recreation of space %s in org %s: %w", details.Space.Name, org.Name, err)
-		}
-		log.Printf("new space GUID: %s", space.GUID)
-
-		log.Printf("recreating space roles")
+		log.Printf("recreating space roles for space %s", space.Name)
 		if err := recreateSpaceDevsAndManagers(ctx, cfClient, space.GUID, developers, managers); err != nil {
 			return fmt.Errorf("error recreating space developers/managers for space %s in org %s: %w", details.Space.Name, org.Name, err)
 		}
@@ -79,16 +69,24 @@ func purgeAndRecreateSpace(
 	return nil
 }
 
-func getSpace(
+func waitUntilSpaceIsFullyDeleted(
 	ctx context.Context,
 	cfClient *cfResourceClient,
 	org *resource.Organization,
 	details SpaceDetails,
-) (*resource.Space, error) {
+) error {
 	spaceListOptions := client.NewSpaceListOptions()
 	spaceListOptions.OrganizationGUIDs.EqualTo(org.GUID)
 	spaceListOptions.Names.EqualTo(details.Space.Name)
-	return cfClient.Spaces.Single(ctx, spaceListOptions)
+	space, err := cfClient.Spaces.Single(ctx, spaceListOptions)
+	for space != nil {
+		if err != nil {
+			return fmt.Errorf("error verifying deletion of space %s in org %s: %w", details.Space.Name, org.Name, err)
+		}
+		space, err = cfClient.Spaces.Single(ctx, spaceListOptions)
+		time.Sleep(100 * time.Millisecond)
+	}
+	return nil
 }
 
 func sendPurgeEmail(
