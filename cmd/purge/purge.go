@@ -84,12 +84,15 @@ func waitUntilSpaceIsFullyDeleted(
 	spaceListOptions.OrganizationGUIDs.EqualTo(org.GUID)
 	spaceListOptions.Names.EqualTo(spaceName)
 	space, err := cfClient.Spaces.Single(ctx, spaceListOptions)
+	if err != nil {
+		return fmt.Errorf("error verifying deletion of space %s in org %s: %w", spaceName, org.Name, err)
+	}
 	for space != nil {
+		log.Printf("space %s has not been fully deleted yet", spaceName)
+		space, err = cfClient.Spaces.Single(ctx, spaceListOptions)
 		if err != nil {
 			return fmt.Errorf("error verifying deletion of space %s in org %s: %w", spaceName, org.Name, err)
 		}
-		log.Printf("space %s has not been fully deleted yet", spaceName)
-		space, err = cfClient.Spaces.Single(ctx, spaceListOptions)
 		time.Sleep(100 * time.Millisecond)
 	}
 	return nil

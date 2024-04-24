@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -87,6 +88,7 @@ type mockSpaces struct {
 	space                      *resource.Space
 	singleCallCount            int
 	mockSingleReturnValues     map[int]mockSpaceSingleReturnValues
+	singleErr                  error
 }
 
 func (s *mockSpaces) ListUsersAll(ctx context.Context, spaceGUID string, opts *client.UserListOptions) ([]*resource.User, error) {
@@ -116,6 +118,9 @@ func (s *mockSpaces) Delete(ctx context.Context, guid string) (string, error) {
 
 func (s *mockSpaces) Single(ctx context.Context, opts *client.SpaceListOptions) (*resource.Space, error) {
 	s.singleCallCount += 1
+	if s.singleErr != nil {
+		return nil, s.singleErr
+	}
 	if s.mockSingleReturnValues != nil {
 		return s.mockSingleReturnValues[s.singleCallCount].space, s.mockSingleReturnValues[s.singleCallCount].err
 	}
@@ -159,11 +164,13 @@ func (m *mockMailSender) sendMail(
 }
 
 func TestWaitUntilSpaceIsFullyDeleted(t *testing.T) {
+	singleErr := errors.New("single error")
 	testCases := map[string]struct {
 		cfClient                *cfResourceClient
 		organization            *resource.Organization
 		spaceName               string
 		expectedSingleCallCount int
+		expectedErr             error
 	}{
 		"success": {
 			cfClient: &cfResourceClient{
@@ -198,6 +205,43 @@ func TestWaitUntilSpaceIsFullyDeleted(t *testing.T) {
 			spaceName:               "space-1",
 			expectedSingleCallCount: 2,
 		},
+		"error": {
+			cfClient: &cfResourceClient{
+				// These mocks are defined elsewhere
+				Spaces: &mockSpaces{
+					singleErr: singleErr,
+				},
+			},
+			organization: &resource.Organization{
+				GUID: "org-guid-1",
+			},
+			spaceName:               "space-1",
+			expectedSingleCallCount: 1,
+			expectedErr:             singleErr,
+		},
+		"error on retry": {
+			cfClient: &cfResourceClient{
+				// These mocks are defined elsewhere
+				Spaces: &mockSpaces{
+					mockSingleReturnValues: map[int]mockSpaceSingleReturnValues{
+						1: {
+							space: &resource.Space{GUID: "space-guid-1"},
+							err:   nil,
+						},
+						2: {
+							space: nil,
+							err:   singleErr,
+						},
+					},
+				},
+			},
+			organization: &resource.Organization{
+				GUID: "org-guid-1",
+			},
+			spaceName:               "space-1",
+			expectedSingleCallCount: 2,
+			expectedErr:             singleErr,
+		},
 	}
 
 	for name, test := range testCases {
@@ -209,8 +253,12 @@ func TestWaitUntilSpaceIsFullyDeleted(t *testing.T) {
 				test.spaceName,
 			)
 
-			if err != nil {
-				t.Fatal(err)
+			if !errors.Is(err, test.expectedErr) {
+				t.Fatalf(
+					"expected err %s, got %s",
+					test.expectedErr,
+					err,
+				)
 			}
 
 			if spacesClient, ok := test.cfClient.Spaces.(*mockSpaces); ok {
