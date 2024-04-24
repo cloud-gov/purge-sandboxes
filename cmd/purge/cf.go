@@ -15,6 +15,7 @@ type ApplicationsClient interface {
 
 type OrganizationsClient interface {
 	ListAll(ctx context.Context, opts *client.OrganizationListOptions) ([]*resource.Organization, error)
+	Single(ctx context.Context, opts *client.OrganizationListOptions) (*resource.Organization, error)
 }
 
 type RolesClient interface {
@@ -31,6 +32,7 @@ type SpacesClient interface {
 	ListUsersAll(ctx context.Context, spaceGUID string, opts *client.UserListOptions) ([]*resource.User, error)
 	Create(ctx context.Context, r *resource.SpaceCreate) (*resource.Space, error)
 	Delete(ctx context.Context, guid string) (string, error)
+	Single(ctx context.Context, opts *client.SpaceListOptions) (*resource.Space, error)
 }
 
 type SpaceQuotasClient interface {

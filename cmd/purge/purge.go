@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"time"
 
 	"github.com/cloudfoundry-community/go-cfclient/v3/client"
 	"github.com/cloudfoundry-community/go-cfclient/v3/resource"
@@ -42,23 +43,52 @@ func purgeAndRecreateSpace(
 		return fmt.Errorf("error sending purge notification email for space %s in org %s: %w", details.Space.Name, org.Name, err)
 	}
 
-	log.Printf("deleting and recreating space %s", details.Space.Name)
+	log.Printf("purging space %s", details.Space.Name)
 	if err := purgeSpace(ctx, cfClient, details.Space); err != nil {
 		return fmt.Errorf("error purging space %s in org %s: %w", details.Space.Name, org.Name, err)
 	}
 
-	if len(developers) > 0 || len(managers) > 0 {
-		log.Printf("recreating space %s", details.Space.Name)
-		if err := recreateSpace(ctx, cfClient, opts, org, details); err != nil {
-			return fmt.Errorf("error recreating space %s in org %s: %w", details.Space.Name, org.Name, err)
+	space, err := getSpace(ctx, cfClient, org, details)
+	for space != nil {
+		if err != nil {
+			return fmt.Errorf("error verifying deletion of space %s in org %s: %w", details.Space.Name, org.Name, err)
 		}
+		log.Printf("space still exists: %s", space.GUID)
+		space, err = getSpace(ctx, cfClient, org, details)
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	log.Printf("recreating space %s", details.Space.Name)
+	if err := recreateSpace(ctx, cfClient, opts, org, details); err != nil {
+		return fmt.Errorf("error recreating space %s in org %s: %w", details.Space.Name, org.Name, err)
+	}
+
+	if len(developers) > 0 || len(managers) > 0 {
+		space, err = getSpace(ctx, cfClient, org, details)
+		if err != nil {
+			return fmt.Errorf("error verifying recreation of space %s in org %s: %w", details.Space.Name, org.Name, err)
+		}
+		log.Printf("new space GUID: %s", space.GUID)
+
 		log.Printf("recreating space roles")
-		if err := recreateSpaceDevsAndManagers(ctx, cfClient, details.Space.GUID, developers, managers); err != nil {
+		if err := recreateSpaceDevsAndManagers(ctx, cfClient, space.GUID, developers, managers); err != nil {
 			return fmt.Errorf("error recreating space developers/managers for space %s in org %s: %w", details.Space.Name, org.Name, err)
 		}
 	}
 
 	return nil
+}
+
+func getSpace(
+	ctx context.Context,
+	cfClient *cfResourceClient,
+	org *resource.Organization,
+	details SpaceDetails,
+) (*resource.Space, error) {
+	spaceListOptions := client.NewSpaceListOptions()
+	spaceListOptions.OrganizationGUIDs.EqualTo(org.GUID)
+	spaceListOptions.Names.EqualTo(details.Space.Name)
+	return cfClient.Spaces.Single(ctx, spaceListOptions)
 }
 
 func sendPurgeEmail(

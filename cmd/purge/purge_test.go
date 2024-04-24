@@ -107,6 +107,10 @@ func (s *mockSpaces) Delete(ctx context.Context, guid string) (string, error) {
 	return "", nil
 }
 
+func (s *mockSpaces) Single(ctx context.Context, opts *client.SpaceListOptions) (*resource.Space, error) {
+	return nil, nil
+}
+
 type mockSpaceQuotas struct {
 	spaceQuotaName string
 	orgGUID        string
