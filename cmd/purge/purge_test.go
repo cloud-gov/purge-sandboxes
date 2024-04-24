@@ -74,12 +74,19 @@ func (r *mockRoles) ListIncludeUsersAll(ctx context.Context, opts *client.RoleLi
 	return r.roles, r.users, nil
 }
 
+type mockSpaceSingleReturnValues struct {
+	space *resource.Space
+	err   error
+}
+
 type mockSpaces struct {
 	listUsersAllErr            error
 	users                      []*resource.User
 	spaceGUID                  string
 	expectedSpaceCreateRequest *resource.SpaceCreate
 	space                      *resource.Space
+	singleCallCount            int
+	mockSingleReturnValues     map[int]mockSpaceSingleReturnValues
 }
 
 func (s *mockSpaces) ListUsersAll(ctx context.Context, spaceGUID string, opts *client.UserListOptions) ([]*resource.User, error) {
@@ -108,6 +115,10 @@ func (s *mockSpaces) Delete(ctx context.Context, guid string) (string, error) {
 }
 
 func (s *mockSpaces) Single(ctx context.Context, opts *client.SpaceListOptions) (*resource.Space, error) {
+	s.singleCallCount += 1
+	if s.mockSingleReturnValues != nil {
+		return s.mockSingleReturnValues[s.singleCallCount].space, s.mockSingleReturnValues[s.singleCallCount].err
+	}
 	return nil, nil
 }
 
@@ -145,6 +156,74 @@ func (m *mockMailSender) sendMail(
 	recipients []string,
 ) error {
 	return nil
+}
+
+func TestWaitUntilSpaceIsFullyDeleted(t *testing.T) {
+	testCases := map[string]struct {
+		cfClient                *cfResourceClient
+		organization            *resource.Organization
+		spaceName               string
+		expectedSingleCallCount int
+	}{
+		"success": {
+			cfClient: &cfResourceClient{
+				// These mocks are defined elsewhere
+				Spaces: &mockSpaces{},
+			},
+			organization: &resource.Organization{
+				GUID: "org-guid-1",
+			},
+			spaceName:               "space-1",
+			expectedSingleCallCount: 1,
+		},
+		"success with retry": {
+			cfClient: &cfResourceClient{
+				// These mocks are defined elsewhere
+				Spaces: &mockSpaces{
+					mockSingleReturnValues: map[int]mockSpaceSingleReturnValues{
+						1: {
+							space: &resource.Space{GUID: "space-guid-1"},
+							err:   nil,
+						},
+						2: {
+							space: nil,
+							err:   nil,
+						},
+					},
+				},
+			},
+			organization: &resource.Organization{
+				GUID: "org-guid-1",
+			},
+			spaceName:               "space-1",
+			expectedSingleCallCount: 2,
+		},
+	}
+
+	for name, test := range testCases {
+		t.Run(name, func(t *testing.T) {
+			err := waitUntilSpaceIsFullyDeleted(
+				context.Background(),
+				test.cfClient,
+				test.organization,
+				test.spaceName,
+			)
+
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if spacesClient, ok := test.cfClient.Spaces.(*mockSpaces); ok {
+				if test.expectedSingleCallCount != spacesClient.singleCallCount {
+					t.Fatalf(
+						"expected %d calls to Spaces.Single(), got %d",
+						test.expectedSingleCallCount,
+						spacesClient.singleCallCount,
+					)
+				}
+			}
+		})
+	}
 }
 
 func TestPurgeAndRecreateSpace(t *testing.T) {

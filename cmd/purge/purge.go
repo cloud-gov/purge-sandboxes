@@ -48,7 +48,12 @@ func purgeAndRecreateSpace(
 		return fmt.Errorf("error purging space %s in org %s: %w", details.Space.Name, org.Name, err)
 	}
 
-	err = waitUntilSpaceIsFullyDeleted(ctx, cfClient, org, details)
+	err = waitUntilSpaceIsFullyDeleted(
+		ctx,
+		cfClient,
+		org,
+		details.Space.Name,
+	)
 	if err != nil {
 		return fmt.Errorf("error waiting until space %s in org %s is deleted: %w", details.Space.Name, org.Name, err)
 	}
@@ -73,16 +78,17 @@ func waitUntilSpaceIsFullyDeleted(
 	ctx context.Context,
 	cfClient *cfResourceClient,
 	org *resource.Organization,
-	details SpaceDetails,
+	spaceName string,
 ) error {
 	spaceListOptions := client.NewSpaceListOptions()
 	spaceListOptions.OrganizationGUIDs.EqualTo(org.GUID)
-	spaceListOptions.Names.EqualTo(details.Space.Name)
+	spaceListOptions.Names.EqualTo(spaceName)
 	space, err := cfClient.Spaces.Single(ctx, spaceListOptions)
 	for space != nil {
 		if err != nil {
-			return fmt.Errorf("error verifying deletion of space %s in org %s: %w", details.Space.Name, org.Name, err)
+			return fmt.Errorf("error verifying deletion of space %s in org %s: %w", spaceName, org.Name, err)
 		}
+		log.Printf("space %s has not been fully deleted yet", spaceName)
 		space, err = cfClient.Spaces.Single(ctx, spaceListOptions)
 		time.Sleep(100 * time.Millisecond)
 	}
