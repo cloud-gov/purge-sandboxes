@@ -365,7 +365,7 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 						},
 					},
 					space: &resource.Space{
-						GUID: "space-1-guid",
+						GUID: "new-space-1-guid",
 						Name: "space-1",
 					},
 				},
@@ -402,7 +402,7 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 			},
 			expectSpaceCreatedRoles: []spaceCreatedRole{
 				{
-					SpaceGUID: "space-1-guid",
+					SpaceGUID: "new-space-1-guid",
 					UserGUID:  "user-1",
 					RoleType:  resource.SpaceRoleManager,
 				},
@@ -479,7 +479,7 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 						},
 					},
 					space: &resource.Space{
-						GUID: "space-1-guid",
+						GUID: "new-space-1-guid",
 						Name: "space-1",
 					},
 				},
@@ -517,12 +517,12 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 			},
 			expectSpaceCreatedRoles: []spaceCreatedRole{
 				{
-					SpaceGUID: "space-1-guid",
+					SpaceGUID: "new-space-1-guid",
 					UserGUID:  "user-1",
 					RoleType:  resource.SpaceRoleManager,
 				},
 				{
-					SpaceGUID: "space-1-guid",
+					SpaceGUID: "new-space-1-guid",
 					UserGUID:  "user-2",
 					RoleType:  resource.SpaceRoleDeveloper,
 				},
@@ -599,7 +599,7 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 						},
 					},
 					space: &resource.Space{
-						GUID: "space-1-guid",
+						GUID: "new-space-1-guid",
 						Name: "space-1",
 					},
 				},
@@ -643,12 +643,12 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 			},
 			expectSpaceCreatedRoles: []spaceCreatedRole{
 				{
-					SpaceGUID: "space-1-guid",
+					SpaceGUID: "new-space-1-guid",
 					UserGUID:  "user-1",
 					RoleType:  resource.SpaceRoleManager,
 				},
 				{
-					SpaceGUID: "space-1-guid",
+					SpaceGUID: "new-space-1-guid",
 					UserGUID:  "user-2",
 					RoleType:  resource.SpaceRoleDeveloper,
 				},
