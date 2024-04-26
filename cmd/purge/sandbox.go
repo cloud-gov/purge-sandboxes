@@ -92,7 +92,7 @@ func recreateSpace(
 	options Options,
 	organization *resource.Organization,
 	details SpaceDetails,
-) error {
+) (*resource.Space, error) {
 	spaceRequest := &resource.SpaceCreate{
 		Name:          details.Space.Name,
 		Relationships: details.Space.Relationships,
@@ -109,7 +109,7 @@ func recreateSpace(
 	}
 	spaceQuota, err := cfClient.SpaceQuotas.Single(ctx, spaceQuotaListOptions)
 	if err != nil {
-		return fmt.Errorf(
+		return nil, fmt.Errorf(
 			"error finding quota %s for space %s in org %s: %w",
 			options.SandboxQuotaName,
 			details.Space.Name,
@@ -120,13 +120,13 @@ func recreateSpace(
 
 	space, err := cfClient.Spaces.Create(ctx, spaceRequest)
 	if err != nil {
-		return fmt.Errorf("error creating space %s in org %s: %w", details.Space.Name, organization.Name, err)
+		return nil, fmt.Errorf("error creating space %s in org %s: %w", details.Space.Name, organization.Name, err)
 	}
 	_, err = cfClient.SpaceQuotas.Apply(ctx, spaceQuota.GUID, []string{space.GUID})
 	if err != nil {
-		return fmt.Errorf("error applying space quota %s to space %s: %w", options.SandboxQuotaName, details.Space.Name, err)
+		return nil, fmt.Errorf("error applying space quota %s to space %s: %w", options.SandboxQuotaName, details.Space.Name, err)
 	}
-	return nil
+	return space, nil
 }
 
 func recreateSpaceDevsAndManagers(
