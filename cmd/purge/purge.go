@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"html/template"
 	"log"
@@ -9,6 +10,10 @@ import (
 
 	"github.com/cloudfoundry-community/go-cfclient/v3/client"
 	"github.com/cloudfoundry-community/go-cfclient/v3/resource"
+)
+
+var (
+	ErrMaximumAttemptsReached = errors.New("maximum attempts reached")
 )
 
 func purgeAndRecreateSpace(
@@ -53,6 +58,7 @@ func purgeAndRecreateSpace(
 		cfClient,
 		org,
 		details.Space.Name,
+		20,
 	)
 	if err != nil {
 		return fmt.Errorf("error waiting until space %s in org %s is deleted: %w", details.Space.Name, org.Name, err)
@@ -79,6 +85,7 @@ func waitUntilSpaceIsFullyDeleted(
 	cfClient *cfResourceClient,
 	org *resource.Organization,
 	spaceName string,
+	maxAttempts int,
 ) error {
 	spaceListOptions := client.NewSpaceListOptions()
 	spaceListOptions.OrganizationGUIDs.EqualTo(org.GUID)
@@ -87,14 +94,32 @@ func waitUntilSpaceIsFullyDeleted(
 	if err != nil {
 		return fmt.Errorf("error verifying deletion of space %s in org %s: %w", spaceName, org.Name, err)
 	}
-	for space != nil {
+
+	attempts := 1
+	if maxAttempts == 0 {
+		maxAttempts = 20
+	}
+
+	for space != nil && attempts < maxAttempts {
 		log.Printf("space %s has not been fully deleted yet", spaceName)
 		space, err = cfClient.Spaces.Single(ctx, spaceListOptions)
 		if err != nil {
 			return fmt.Errorf("error verifying deletion of space %s in org %s: %w", spaceName, org.Name, err)
 		}
 		time.Sleep(100 * time.Millisecond)
+		attempts += 1
 	}
+
+	if attempts == maxAttempts && space != nil {
+		return fmt.Errorf(
+			"could not verify deletion of space %s in org %s after %d attempts: %w",
+			spaceName,
+			org.Name,
+			maxAttempts,
+			ErrMaximumAttemptsReached,
+		)
+	}
+
 	return nil
 }
 

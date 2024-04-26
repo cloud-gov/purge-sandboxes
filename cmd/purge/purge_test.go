@@ -171,6 +171,7 @@ func TestWaitUntilSpaceIsFullyDeleted(t *testing.T) {
 		spaceName               string
 		expectedSingleCallCount int
 		expectedErr             error
+		maxAttempts             int
 	}{
 		"success": {
 			cfClient: &cfResourceClient{
@@ -182,6 +183,7 @@ func TestWaitUntilSpaceIsFullyDeleted(t *testing.T) {
 			},
 			spaceName:               "space-1",
 			expectedSingleCallCount: 1,
+			maxAttempts:             3,
 		},
 		"success with retry": {
 			cfClient: &cfResourceClient{
@@ -204,6 +206,7 @@ func TestWaitUntilSpaceIsFullyDeleted(t *testing.T) {
 			},
 			spaceName:               "space-1",
 			expectedSingleCallCount: 2,
+			maxAttempts:             3,
 		},
 		"error": {
 			cfClient: &cfResourceClient{
@@ -218,6 +221,7 @@ func TestWaitUntilSpaceIsFullyDeleted(t *testing.T) {
 			spaceName:               "space-1",
 			expectedSingleCallCount: 1,
 			expectedErr:             singleErr,
+			maxAttempts:             3,
 		},
 		"error on retry": {
 			cfClient: &cfResourceClient{
@@ -241,6 +245,35 @@ func TestWaitUntilSpaceIsFullyDeleted(t *testing.T) {
 			spaceName:               "space-1",
 			expectedSingleCallCount: 2,
 			expectedErr:             singleErr,
+			maxAttempts:             3,
+		},
+		"gives up after maximum allowed retries": {
+			cfClient: &cfResourceClient{
+				// These mocks are defined elsewhere
+				Spaces: &mockSpaces{
+					mockSingleReturnValues: map[int]mockSpaceSingleReturnValues{
+						1: {
+							space: &resource.Space{GUID: "space-guid-1"},
+							err:   nil,
+						},
+						2: {
+							space: &resource.Space{GUID: "space-guid-1"},
+							err:   nil,
+						},
+						3: {
+							space: &resource.Space{GUID: "space-guid-1"},
+							err:   nil,
+						},
+					},
+				},
+			},
+			organization: &resource.Organization{
+				GUID: "org-guid-1",
+			},
+			spaceName:               "space-1",
+			expectedSingleCallCount: 3,
+			expectedErr:             ErrMaximumAttemptsReached,
+			maxAttempts:             3,
 		},
 	}
 
@@ -251,6 +284,7 @@ func TestWaitUntilSpaceIsFullyDeleted(t *testing.T) {
 				test.cfClient,
 				test.organization,
 				test.spaceName,
+				test.maxAttempts,
 			)
 
 			if !errors.Is(err, test.expectedErr) {
