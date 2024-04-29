@@ -77,8 +77,7 @@ func purgeAndRecreateSpace(
 
 func waitForSpaceDeletion(ctx context.Context, cfClient *cfResourceClient, deleteJobGUID string) error {
 	if deleteJobGUID == "" {
-		log.Print("no job GUID for deletion of the space, cannot verify deletion")
-		return nil
+		return fmt.Errorf("no job GUID for deletion of the space, cannot verify deletion")
 	}
 
 	pollingOptions := client.NewPollingOptions()
