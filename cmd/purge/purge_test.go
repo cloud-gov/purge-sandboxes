@@ -177,7 +177,8 @@ func TestWaitForSpaceDeletion(t *testing.T) {
 		"error": {
 			cfClient: &cfResourceClient{
 				Jobs: &mockJobs{
-					pollErr: pollErr,
+					pollErr:         pollErr,
+					expectedJobGUID: "delete-1",
 				},
 			},
 			deleteJobGUID: "delete-1",
