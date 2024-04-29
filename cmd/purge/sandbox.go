@@ -156,8 +156,8 @@ func purgeSpace(
 	ctx context.Context,
 	cfClient *cfResourceClient,
 	space *resource.Space,
-) error {
-	_, spaceErr := cfClient.Spaces.Delete(ctx, space.GUID)
+) (string, error) {
+	jobGUID, spaceErr := cfClient.Spaces.Delete(ctx, space.GUID)
 	if spaceErr != nil {
 		apps, err := cfClient.Applications.ListAll(ctx, &client.AppListOptions{
 			SpaceGUIDs: client.Filter{
@@ -165,17 +165,17 @@ func purgeSpace(
 			},
 		})
 		if err != nil {
-			return err
+			return "", err
 		}
 		for _, app := range apps {
 			_, err := cfClient.Applications.Delete(ctx, app.GUID)
 			if err != nil {
-				return err
+				return "", err
 			}
 		}
-		return spaceErr
+		return "", spaceErr
 	}
-	return nil
+	return jobGUID, spaceErr
 }
 
 // listSandboxOrgs lists all sandbox organizations
