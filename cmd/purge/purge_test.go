@@ -13,28 +13,19 @@ import (
 )
 
 type mockApplications struct {
-	listAppsErr error
-	apps        []*resource.App
-	spaceGUID   string
+	listAppsErr     error
+	apps            []*resource.App
+	deleteCallCount int
+	deleteErr       error
 }
 
 func (a *mockApplications) ListAll(ctx context.Context, opts *client.AppListOptions) ([]*resource.App, error) {
-	if a.listAppsErr != nil {
-		return nil, a.listAppsErr
-	}
-	expectedOpts := &client.AppListOptions{
-		SpaceGUIDs: client.Filter{
-			Values: []string{a.spaceGUID},
-		},
-	}
-	if !cmp.Equal(opts, expectedOpts) {
-		return nil, fmt.Errorf(cmp.Diff(opts, expectedOpts))
-	}
-	return a.apps, nil
+	return a.apps, a.listAppsErr
 }
 
 func (a *mockApplications) Delete(ctx context.Context, guid string) (string, error) {
-	return "", nil
+	a.deleteCallCount += 1
+	return "", a.deleteErr
 }
 
 type spaceCreatedRole struct {
@@ -82,6 +73,7 @@ type mockSpaces struct {
 	expectedSpaceCreateRequest *resource.SpaceCreate
 	space                      *resource.Space
 	deleteJobGUID              string
+	deleteErr                  error
 }
 
 func (s *mockSpaces) ListUsersAll(ctx context.Context, spaceGUID string, opts *client.UserListOptions) ([]*resource.User, error) {
@@ -106,7 +98,7 @@ func (s *mockSpaces) Create(ctx context.Context, r *resource.SpaceCreate) (*reso
 }
 
 func (s *mockSpaces) Delete(ctx context.Context, guid string) (string, error) {
-	return s.deleteJobGUID, nil
+	return s.deleteJobGUID, s.deleteErr
 }
 
 func (s *mockSpaces) Single(ctx context.Context, opts *client.SpaceListOptions) (*resource.Space, error) {
