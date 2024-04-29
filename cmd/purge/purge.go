@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	ErrMaximumAttemptsReached = errors.New("maximum attempts reached")
+	ErrNoSpaceDeleteJobGUID = errors.New("cannot verify space deletion: no job GUID")
 )
 
 func purgeAndRecreateSpace(
@@ -77,7 +77,7 @@ func purgeAndRecreateSpace(
 
 func waitForSpaceDeletion(ctx context.Context, cfClient *cfResourceClient, deleteJobGUID string) error {
 	if deleteJobGUID == "" {
-		return fmt.Errorf("no job GUID for deletion of the space, cannot verify deletion")
+		return ErrNoSpaceDeleteJobGUID
 	}
 
 	pollingOptions := client.NewPollingOptions()

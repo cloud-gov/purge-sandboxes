@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -137,14 +138,15 @@ func (q *mockSpaceQuotas) Apply(ctx context.Context, guid string, spaceGUIDs []s
 }
 
 type mockJobs struct {
-	expectedDeleteJobGUID string
+	expectedJobGUID string
+	pollErr         error
 }
 
 func (j *mockJobs) PollComplete(ctx context.Context, jobGUID string, opts *client.PollingOptions) error {
-	if j.expectedDeleteJobGUID != jobGUID {
-		return fmt.Errorf("expected job GUID: %s, received: %s", j.expectedDeleteJobGUID, jobGUID)
+	if j.expectedJobGUID != jobGUID {
+		return fmt.Errorf("expected job GUID: %s, received: %s", j.expectedJobGUID, jobGUID)
 	}
-	return nil
+	return j.pollErr
 }
 
 type mockMailSender struct{}
@@ -157,6 +159,53 @@ func (m *mockMailSender) sendMail(
 	recipients []string,
 ) error {
 	return nil
+}
+
+func TestWaitForSpaceDeletion(t *testing.T) {
+	pollErr := errors.New("polling error")
+	testCases := map[string]struct {
+		cfClient      *cfResourceClient
+		deleteJobGUID string
+		expectedErr   error
+	}{
+		"success": {
+			cfClient: &cfResourceClient{
+				Jobs: &mockJobs{
+					expectedJobGUID: "delete-1",
+				},
+			},
+			deleteJobGUID: "delete-1",
+		},
+		"no job GUID": {
+			cfClient: &cfResourceClient{
+				Jobs: &mockJobs{},
+			},
+			expectedErr: ErrNoSpaceDeleteJobGUID,
+		},
+		"error": {
+			cfClient: &cfResourceClient{
+				Jobs: &mockJobs{
+					pollErr: pollErr,
+				},
+			},
+			deleteJobGUID: "delete-1",
+			expectedErr:   pollErr,
+		},
+	}
+
+	for name, test := range testCases {
+		t.Run(name, func(t *testing.T) {
+			err := waitForSpaceDeletion(
+				context.Background(),
+				test.cfClient,
+				test.deleteJobGUID,
+			)
+
+			if !errors.Is(err, test.expectedErr) {
+				t.Fatal(err)
+			}
+		})
+	}
 }
 
 func TestPurgeAndRecreateSpace(t *testing.T) {
@@ -229,7 +278,7 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 					},
 				},
 				Jobs: &mockJobs{
-					expectedDeleteJobGUID: "delete-space-1",
+					expectedJobGUID: "delete-space-1",
 				},
 			},
 			userGUIDs: map[string]bool{
@@ -347,7 +396,7 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 					},
 				},
 				Jobs: &mockJobs{
-					expectedDeleteJobGUID: "space-delete-1",
+					expectedJobGUID: "space-delete-1",
 				},
 			},
 			userGUIDs: map[string]bool{
@@ -472,7 +521,7 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 					},
 				},
 				Jobs: &mockJobs{
-					expectedDeleteJobGUID: "space-delete-1",
+					expectedJobGUID: "space-delete-1",
 				},
 			},
 			userGUIDs: map[string]bool{
