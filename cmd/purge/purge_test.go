@@ -13,28 +13,19 @@ import (
 )
 
 type mockApplications struct {
-	listAppsErr error
-	apps        []*resource.App
-	spaceGUID   string
+	listAppsErr     error
+	apps            []*resource.App
+	deleteCallCount int
+	deleteErr       error
 }
 
 func (a *mockApplications) ListAll(ctx context.Context, opts *client.AppListOptions) ([]*resource.App, error) {
-	if a.listAppsErr != nil {
-		return nil, a.listAppsErr
-	}
-	expectedOpts := &client.AppListOptions{
-		SpaceGUIDs: client.Filter{
-			Values: []string{a.spaceGUID},
-		},
-	}
-	if !cmp.Equal(opts, expectedOpts) {
-		return nil, fmt.Errorf(cmp.Diff(opts, expectedOpts))
-	}
-	return a.apps, nil
+	return a.apps, a.listAppsErr
 }
 
 func (a *mockApplications) Delete(ctx context.Context, guid string) (string, error) {
-	return "", nil
+	a.deleteCallCount += 1
+	return "", a.deleteErr
 }
 
 type spaceCreatedRole struct {
@@ -75,20 +66,14 @@ func (r *mockRoles) ListIncludeUsersAll(ctx context.Context, opts *client.RoleLi
 	return r.roles, r.users, nil
 }
 
-type mockSpaceSingleReturnValues struct {
-	space *resource.Space
-	err   error
-}
-
 type mockSpaces struct {
 	listUsersAllErr            error
 	users                      []*resource.User
 	spaceGUID                  string
 	expectedSpaceCreateRequest *resource.SpaceCreate
 	space                      *resource.Space
-	singleCallCount            int
-	mockSingleReturnValues     map[int]mockSpaceSingleReturnValues
-	singleErr                  error
+	deleteJobGUID              string
+	deleteErr                  error
 }
 
 func (s *mockSpaces) ListUsersAll(ctx context.Context, spaceGUID string, opts *client.UserListOptions) ([]*resource.User, error) {
@@ -113,17 +98,10 @@ func (s *mockSpaces) Create(ctx context.Context, r *resource.SpaceCreate) (*reso
 }
 
 func (s *mockSpaces) Delete(ctx context.Context, guid string) (string, error) {
-	return "", nil
+	return s.deleteJobGUID, s.deleteErr
 }
 
 func (s *mockSpaces) Single(ctx context.Context, opts *client.SpaceListOptions) (*resource.Space, error) {
-	s.singleCallCount += 1
-	if s.singleErr != nil {
-		return nil, s.singleErr
-	}
-	if s.mockSingleReturnValues != nil {
-		return s.mockSingleReturnValues[s.singleCallCount].space, s.mockSingleReturnValues[s.singleCallCount].err
-	}
 	return nil, nil
 }
 
@@ -151,6 +129,18 @@ func (q *mockSpaceQuotas) Apply(ctx context.Context, guid string, spaceGUIDs []s
 	return []string{}, nil
 }
 
+type mockJobs struct {
+	expectedJobGUID string
+	pollErr         error
+}
+
+func (j *mockJobs) PollComplete(ctx context.Context, jobGUID string, opts *client.PollingOptions) error {
+	if j.expectedJobGUID != jobGUID {
+		return fmt.Errorf("expected job GUID: %s, received: %s", j.expectedJobGUID, jobGUID)
+	}
+	return j.pollErr
+}
+
 type mockMailSender struct{}
 
 func (m *mockMailSender) sendMail(
@@ -163,146 +153,49 @@ func (m *mockMailSender) sendMail(
 	return nil
 }
 
-func TestWaitUntilSpaceIsFullyDeleted(t *testing.T) {
-	singleErr := errors.New("single error")
+func TestWaitForSpaceDeletion(t *testing.T) {
+	pollErr := errors.New("polling error")
 	testCases := map[string]struct {
-		cfClient                *cfResourceClient
-		organization            *resource.Organization
-		spaceName               string
-		expectedSingleCallCount int
-		expectedErr             error
-		maxAttempts             int
+		cfClient      *cfResourceClient
+		deleteJobGUID string
+		expectedErr   error
 	}{
 		"success": {
 			cfClient: &cfResourceClient{
-				// These mocks are defined elsewhere
-				Spaces: &mockSpaces{},
-			},
-			organization: &resource.Organization{
-				GUID: "org-guid-1",
-			},
-			spaceName:               "space-1",
-			expectedSingleCallCount: 1,
-			maxAttempts:             3,
-		},
-		"success with retry": {
-			cfClient: &cfResourceClient{
-				// These mocks are defined elsewhere
-				Spaces: &mockSpaces{
-					mockSingleReturnValues: map[int]mockSpaceSingleReturnValues{
-						1: {
-							space: &resource.Space{GUID: "space-guid-1"},
-							err:   nil,
-						},
-						2: {
-							space: nil,
-							err:   nil,
-						},
-					},
+				Jobs: &mockJobs{
+					expectedJobGUID: "delete-1",
 				},
 			},
-			organization: &resource.Organization{
-				GUID: "org-guid-1",
+			deleteJobGUID: "delete-1",
+		},
+		"no job GUID": {
+			cfClient: &cfResourceClient{
+				Jobs: &mockJobs{},
 			},
-			spaceName:               "space-1",
-			expectedSingleCallCount: 2,
-			maxAttempts:             3,
+			expectedErr: ErrNoSpaceDeleteJobGUID,
 		},
 		"error": {
 			cfClient: &cfResourceClient{
-				// These mocks are defined elsewhere
-				Spaces: &mockSpaces{
-					singleErr: singleErr,
+				Jobs: &mockJobs{
+					pollErr:         pollErr,
+					expectedJobGUID: "delete-1",
 				},
 			},
-			organization: &resource.Organization{
-				GUID: "org-guid-1",
-			},
-			spaceName:               "space-1",
-			expectedSingleCallCount: 1,
-			expectedErr:             singleErr,
-			maxAttempts:             3,
-		},
-		"error on retry": {
-			cfClient: &cfResourceClient{
-				// These mocks are defined elsewhere
-				Spaces: &mockSpaces{
-					mockSingleReturnValues: map[int]mockSpaceSingleReturnValues{
-						1: {
-							space: &resource.Space{GUID: "space-guid-1"},
-							err:   nil,
-						},
-						2: {
-							space: nil,
-							err:   singleErr,
-						},
-					},
-				},
-			},
-			organization: &resource.Organization{
-				GUID: "org-guid-1",
-			},
-			spaceName:               "space-1",
-			expectedSingleCallCount: 2,
-			expectedErr:             singleErr,
-			maxAttempts:             3,
-		},
-		"gives up after maximum allowed retries": {
-			cfClient: &cfResourceClient{
-				// These mocks are defined elsewhere
-				Spaces: &mockSpaces{
-					mockSingleReturnValues: map[int]mockSpaceSingleReturnValues{
-						1: {
-							space: &resource.Space{GUID: "space-guid-1"},
-							err:   nil,
-						},
-						2: {
-							space: &resource.Space{GUID: "space-guid-1"},
-							err:   nil,
-						},
-						3: {
-							space: &resource.Space{GUID: "space-guid-1"},
-							err:   nil,
-						},
-					},
-				},
-			},
-			organization: &resource.Organization{
-				GUID: "org-guid-1",
-			},
-			spaceName:               "space-1",
-			expectedSingleCallCount: 3,
-			expectedErr:             ErrMaximumAttemptsReached,
-			maxAttempts:             3,
+			deleteJobGUID: "delete-1",
+			expectedErr:   pollErr,
 		},
 	}
 
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
-			err := waitUntilSpaceIsFullyDeleted(
+			err := waitForSpaceDeletion(
 				context.Background(),
 				test.cfClient,
-				test.organization,
-				test.spaceName,
-				test.maxAttempts,
+				test.deleteJobGUID,
 			)
 
 			if !errors.Is(err, test.expectedErr) {
-				t.Fatalf(
-					"expected err %s, got %s",
-					test.expectedErr,
-					err,
-				)
-			}
-
-			if spacesClient, ok := test.cfClient.Spaces.(*mockSpaces); ok {
-				if test.expectedSingleCallCount != spacesClient.singleCallCount {
-					t.Fatalf(
-						"expected %d calls to Spaces.Single(), got %d",
-						test.expectedSingleCallCount,
-						spacesClient.singleCallCount,
-					)
-				}
+				t.Fatal(err)
 			}
 		})
 	}
@@ -368,6 +261,7 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 						GUID: "new-space-1-guid",
 						Name: "space-1",
 					},
+					deleteJobGUID: "delete-space-1",
 				},
 				SpaceQuotas: &mockSpaceQuotas{
 					orgGUID:        "org-1",
@@ -375,6 +269,9 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 					quota: &resource.SpaceQuota{
 						GUID: "quota-guid-1",
 					},
+				},
+				Jobs: &mockJobs{
+					expectedJobGUID: "delete-space-1",
 				},
 			},
 			userGUIDs: map[string]bool{
@@ -482,6 +379,7 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 						GUID: "new-space-1-guid",
 						Name: "space-1",
 					},
+					deleteJobGUID: "space-delete-1",
 				},
 				SpaceQuotas: &mockSpaceQuotas{
 					orgGUID:        "org-1",
@@ -489,6 +387,9 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 					quota: &resource.SpaceQuota{
 						GUID: "quota-guid-1",
 					},
+				},
+				Jobs: &mockJobs{
+					expectedJobGUID: "space-delete-1",
 				},
 			},
 			userGUIDs: map[string]bool{
@@ -602,6 +503,7 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 						GUID: "new-space-1-guid",
 						Name: "space-1",
 					},
+					deleteJobGUID: "space-delete-1",
 				},
 				SpaceQuotas: &mockSpaceQuotas{
 					spaceQuotaName: "quota-1",
@@ -610,6 +512,9 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 						Name: "quota-1",
 						GUID: "quota-guid-1",
 					},
+				},
+				Jobs: &mockJobs{
+					expectedJobGUID: "space-delete-1",
 				},
 			},
 			userGUIDs: map[string]bool{

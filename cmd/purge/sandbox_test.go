@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -629,6 +631,110 @@ func TestGetFirstResource(t *testing.T) {
 			}
 			if !cmp.Equal(test.expectedFirstResource, firstResource) {
 				t.Errorf("GetFirstResource() expected: %s, got: %s", test.expectedFirstResource, firstResource)
+			}
+		})
+	}
+}
+
+func TestPurgeSpace(t *testing.T) {
+	deleteSpaceErr := errors.New("delete space error")
+	listAppsErr := errors.New("error listing applications")
+	deleteAppErr := errors.New("delete app error")
+
+	testCases := map[string]struct {
+		cfClient              *cfResourceClient
+		space                 *resource.Space
+		expectedErr           error
+		expectedDeleteJobGUID string
+		expectDeleteCallCount int
+	}{
+		"success": {
+			cfClient: &cfResourceClient{
+				Spaces: &mockSpaces{
+					deleteJobGUID: "delete-1",
+				},
+				Applications: &mockApplications{},
+			},
+			space: &resource.Space{
+				GUID: "space-1",
+			},
+			expectedDeleteJobGUID: "delete-1",
+		},
+		"error deleting space": {
+			cfClient: &cfResourceClient{
+				Spaces: &mockSpaces{
+					deleteErr: deleteSpaceErr,
+				},
+				Applications: &mockApplications{
+					apps: []*resource.App{
+						{
+							GUID: "app-1",
+						},
+					},
+				},
+			},
+			space: &resource.Space{
+				GUID: "space-1",
+			},
+			expectedErr:           deleteSpaceErr,
+			expectDeleteCallCount: 1,
+		},
+		"error listing applications": {
+			cfClient: &cfResourceClient{
+				Spaces: &mockSpaces{
+					deleteErr: deleteSpaceErr,
+				},
+				Applications: &mockApplications{
+					listAppsErr: listAppsErr,
+				},
+			},
+			space: &resource.Space{
+				GUID: "space-1",
+			},
+			expectedErr: listAppsErr,
+		},
+		"error deleting applications": {
+			cfClient: &cfResourceClient{
+				Spaces: &mockSpaces{
+					deleteErr: deleteSpaceErr,
+				},
+				Applications: &mockApplications{
+					apps: []*resource.App{
+						{
+							GUID: "app-1",
+						},
+					},
+					deleteErr: deleteAppErr,
+				},
+			},
+			space: &resource.Space{
+				GUID: "space-1",
+			},
+			expectDeleteCallCount: 1,
+			expectedErr:           deleteAppErr,
+		},
+	}
+
+	for name, test := range testCases {
+		t.Run(name, func(t *testing.T) {
+			deleteJobGUID, err := purgeSpace(
+				context.Background(),
+				test.cfClient,
+				test.space,
+			)
+
+			if deleteJobGUID != test.expectedDeleteJobGUID {
+				t.Fatalf("expected delete job GUID: %s, got: %s", test.expectedDeleteJobGUID, deleteJobGUID)
+			}
+
+			if mockApps, ok := test.cfClient.Applications.(*mockApplications); ok {
+				if mockApps.deleteCallCount != test.expectDeleteCallCount {
+					t.Fatalf("expected app delete call count: %d, got: %d", test.expectDeleteCallCount, mockApps.deleteCallCount)
+				}
+			}
+
+			if !errors.Is(err, test.expectedErr) {
+				t.Fatalf("expected error: %s, got: %s", test.expectedErr, err)
 			}
 		})
 	}

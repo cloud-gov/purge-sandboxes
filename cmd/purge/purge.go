@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	ErrMaximumAttemptsReached = errors.New("maximum attempts reached")
+	ErrNoSpaceDeleteJobGUID = errors.New("cannot verify space deletion: no job GUID")
 )
 
 func purgeAndRecreateSpace(
@@ -49,19 +49,14 @@ func purgeAndRecreateSpace(
 	}
 
 	log.Printf("purging space %s", details.Space.Name)
-	if err := purgeSpace(ctx, cfClient, details.Space); err != nil {
+	deleteJobGUID, err := purgeSpace(ctx, cfClient, details.Space)
+	if err != nil {
 		return fmt.Errorf("error purging space %s in org %s: %w", details.Space.Name, org.Name, err)
 	}
 
-	err = waitUntilSpaceIsFullyDeleted(
-		ctx,
-		cfClient,
-		org,
-		details.Space.Name,
-		20,
-	)
+	err = waitForSpaceDeletion(ctx, cfClient, deleteJobGUID)
 	if err != nil {
-		return fmt.Errorf("error waiting until space %s in org %s is deleted: %w", details.Space.Name, org.Name, err)
+		return fmt.Errorf("error waiting for delete job %s to be complete: %w", deleteJobGUID, err)
 	}
 
 	log.Printf("recreating space %s", details.Space.Name)
@@ -80,47 +75,14 @@ func purgeAndRecreateSpace(
 	return nil
 }
 
-func waitUntilSpaceIsFullyDeleted(
-	ctx context.Context,
-	cfClient *cfResourceClient,
-	org *resource.Organization,
-	spaceName string,
-	maxAttempts int,
-) error {
-	spaceListOptions := client.NewSpaceListOptions()
-	spaceListOptions.OrganizationGUIDs.EqualTo(org.GUID)
-	spaceListOptions.Names.EqualTo(spaceName)
-	space, err := cfClient.Spaces.Single(ctx, spaceListOptions)
-	if err != nil {
-		return fmt.Errorf("error verifying deletion of space %s in org %s: %w", spaceName, org.Name, err)
+func waitForSpaceDeletion(ctx context.Context, cfClient *cfResourceClient, deleteJobGUID string) error {
+	if deleteJobGUID == "" {
+		return ErrNoSpaceDeleteJobGUID
 	}
 
-	attempts := 1
-	if maxAttempts == 0 {
-		maxAttempts = 20
-	}
-
-	for space != nil && attempts < maxAttempts {
-		log.Printf("space %s has not been fully deleted yet", spaceName)
-		space, err = cfClient.Spaces.Single(ctx, spaceListOptions)
-		if err != nil {
-			return fmt.Errorf("error verifying deletion of space %s in org %s: %w", spaceName, org.Name, err)
-		}
-		time.Sleep(100 * time.Millisecond)
-		attempts += 1
-	}
-
-	if attempts == maxAttempts && space != nil {
-		return fmt.Errorf(
-			"could not verify deletion of space %s in org %s after %d attempts: %w",
-			spaceName,
-			org.Name,
-			maxAttempts,
-			ErrMaximumAttemptsReached,
-		)
-	}
-
-	return nil
+	pollingOptions := client.NewPollingOptions()
+	pollingOptions.Timeout = 1 * time.Minute
+	return cfClient.Jobs.PollComplete(ctx, deleteJobGUID, pollingOptions)
 }
 
 func sendPurgeEmail(

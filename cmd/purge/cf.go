@@ -44,6 +44,10 @@ type UsersClient interface {
 	ListAll(ctx context.Context, opts *client.UserListOptions) ([]*resource.User, error)
 }
 
+type JobsClient interface {
+	PollComplete(ctx context.Context, jobGUID string, opts *client.PollingOptions) error
+}
+
 type cfResourceClient struct {
 	Applications     ApplicationsClient
 	Organizations    OrganizationsClient
@@ -52,6 +56,7 @@ type cfResourceClient struct {
 	Spaces           SpacesClient
 	SpaceQuotas      SpaceQuotasClient
 	Users            UsersClient
+	Jobs             JobsClient
 }
 
 func newCFClient(
@@ -79,5 +84,6 @@ func newCFClient(
 		Spaces:           cf.Spaces,
 		SpaceQuotas:      cf.SpaceQuotas,
 		Users:            cf.Users,
+		Jobs:             cf.Jobs,
 	}, nil
 }
