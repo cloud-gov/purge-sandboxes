@@ -5,7 +5,7 @@ set -e
 export GOPATH=$(pwd)/gopath
 export PATH=$PATH:$GOPATH/bin
 
-cd gopath/src/github.com/18F/purge-sandboxes
+cd gopath/src/github.com/cloud-gov/purge-sandboxes
 
 cd cmd/purge
 

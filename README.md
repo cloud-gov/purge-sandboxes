@@ -1,12 +1,10 @@
-# purge-sandboxes 
-
-[![Code Climate](https://codeclimate.com/github/18F/purge-sandboxes/badges/gpa.svg)](https://codeclimate.com/github/18F/purge-sandboxes)
+# purge-sandboxes
 
 Purges cloud.gov sandbox resources.
 
-See https://github.com/18F/purge-sandboxes-bot for the code that automatically creates sandbox spaces for whitelisted users.
+See <https://github.com/cloud-gov/cg-sandbox-bot> for the code that automatically creates sandbox spaces for whitelisted users.
 
-## Contributing 
+## Contributing
 
 See [CONTRIBUTING](CONTRIBUTING.md) for additional information.
 

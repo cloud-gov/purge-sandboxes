@@ -1,4 +1,4 @@
-module github.com/18f/purge-sandboxes
+module github.com/cloud-gov/purge-sandboxes
 
 go 1.22
 
