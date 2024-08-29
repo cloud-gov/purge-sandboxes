@@ -2,6 +2,6 @@
 
 set -e
 
-cd cg-sandbox
+cd purge-sandboxes
 
 go test ./...

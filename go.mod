@@ -1,4 +1,4 @@
-module github.com/18f/cg-sandbox
+module github.com/18f/purge-sandboxes
 
 go 1.22
 
