@@ -121,7 +121,7 @@ resources:
   type: git
   source:
     commit_verification_keys: ((cloud-gov-pgp-keys))
-    uri: https://github.com/cloud-gov/cg-sandbox
+    uri: https://github.com/cloud-gov/purge-sandboxes
     branch: main
 
 - name: schedule

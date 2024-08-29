@@ -9,10 +9,10 @@ image_resource:
 
 inputs:
 - name: sandbox-source
-  path: gopath/src/github.com/18F/cg-sandbox
+  path: gopath/src/github.com/cloud-gov/purge-sandboxes
 
 run:
-  path: gopath/src/github.com/18F/cg-sandbox/ci/purge.sh
+  path: gopath/src/github.com/cloud-gov/purge-sandboxes/ci/purge.sh
 
 params:
   API_ADDRESS:

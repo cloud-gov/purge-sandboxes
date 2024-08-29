@@ -9,7 +9,7 @@ image_resource:
 
 inputs:
 - name: sandbox-source
-  path: cg-sandbox
+  path: purge-sandboxes
 
 run:
-  path: cg-sandbox/ci/test.sh
+  path: purge-sandboxes/ci/test.sh
