@@ -636,6 +636,126 @@ func TestGetFirstResource(t *testing.T) {
 	}
 }
 
+func TestGetRetrySettingsDefaults(t *testing.T) {
+	maxRetries, retryDelay, err := getRetrySettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if maxRetries != int64(60) {
+		t.Fail()
+	}
+
+	if retryDelay != int64(60) {
+		t.Fail()
+	}
+}
+
+func TestGetRetrySettingsFromEnvironment(t *testing.T) {
+	t.Setenv("MAX_CF_POLL_RETRIES", "10")
+	t.Setenv("CF_POLL_RETRY_DELAY", "5")
+
+	maxRetries, retryDelay, err := getRetrySettings()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if maxRetries != int64(10) {
+		t.Fail()
+	}
+
+	if retryDelay != int64(5) {
+		t.Fail()
+	}
+}
+
+func TestWaitForServiceDeletion(t *testing.T) {
+	testCases := map[string]struct {
+		cfClient                            *cfResourceClient
+		service                             *resource.ServiceInstance
+		expectErr                           bool
+		maxRetries                          int64
+		retryDelay                          int64
+		expectedGetServiceInstanceCallCount int64
+	}{
+		"success": {
+			cfClient: &cfResourceClient{
+				ServiceInstances: &mockServiceInstances{
+					getServiceInstanceErr: resource.NewNotFoundError(),
+				},
+			},
+			service: &resource.ServiceInstance{
+				GUID: "service-1",
+			},
+			maxRetries:                          1,
+			retryDelay:                          0,
+			expectedGetServiceInstanceCallCount: 1,
+		},
+		"error deleting service instance": {
+			cfClient: &cfResourceClient{
+				ServiceInstances: &mockServiceInstances{
+					deleteServiceInstanceErr: errors.New("fail"),
+				},
+			},
+			service: &resource.ServiceInstance{
+				GUID: "service-1",
+			},
+			maxRetries: 1,
+			retryDelay: 0,
+			expectErr:  true,
+		},
+		"unexpected error fetching service instance": {
+			cfClient: &cfResourceClient{
+				ServiceInstances: &mockServiceInstances{
+					getServiceInstanceErr: errors.New("fail"),
+				},
+			},
+			service: &resource.ServiceInstance{
+				GUID: "service-1",
+			},
+			maxRetries:                          1,
+			retryDelay:                          0,
+			expectErr:                           true,
+			expectedGetServiceInstanceCallCount: 1,
+		},
+		"gives up after maximum retries waiting for deletion to complete": {
+			cfClient: &cfResourceClient{
+				ServiceInstances: &mockServiceInstances{},
+			},
+			service: &resource.ServiceInstance{
+				GUID: "service-1",
+			},
+			maxRetries:                          5,
+			retryDelay:                          0,
+			expectErr:                           true,
+			expectedGetServiceInstanceCallCount: 5,
+		},
+	}
+
+	for name, test := range testCases {
+		t.Run(name, func(t *testing.T) {
+			err := waitForServiceInstanceDeletion(
+				context.Background(),
+				test.cfClient,
+				test.service,
+				test.maxRetries,
+				test.retryDelay,
+			)
+			if !test.expectErr && err != nil {
+				t.Fatal(err)
+			}
+			if test.expectErr && err == nil {
+				t.Fatal("expected error but got none")
+			}
+			if mockServiceInstancesClient, ok := test.cfClient.ServiceInstances.(*mockServiceInstances); ok {
+				if test.expectedGetServiceInstanceCallCount != int64(mockServiceInstancesClient.getServiceInstanceCallCount) {
+					t.Fatalf("expected %d, got %d", test.expectedGetServiceInstanceCallCount, mockServiceInstancesClient.getServiceInstanceCallCount)
+				}
+			}
+		})
+	}
+}
+
 func TestPurgeSpace(t *testing.T) {
 	deleteSpaceErr := errors.New("delete space error")
 	listAppsErr := errors.New("error listing applications")
@@ -653,7 +773,28 @@ func TestPurgeSpace(t *testing.T) {
 				Spaces: &mockSpaces{
 					deleteJobGUID: "delete-1",
 				},
+				Applications:     &mockApplications{},
+				ServiceInstances: &mockServiceInstances{},
+			},
+			space: &resource.Space{
+				GUID: "space-1",
+			},
+			expectedDeleteJobGUID: "delete-1",
+		},
+		"success with deletion of service instance": {
+			cfClient: &cfResourceClient{
+				Spaces: &mockSpaces{
+					deleteJobGUID: "delete-1",
+				},
 				Applications: &mockApplications{},
+				ServiceInstances: &mockServiceInstances{
+					listAllServiceInstances: []*resource.ServiceInstance{
+						{
+							GUID: "service-1",
+						},
+					},
+					getServiceInstanceErr: resource.NewNotFoundError(),
+				},
 			},
 			space: &resource.Space{
 				GUID: "space-1",
@@ -672,6 +813,7 @@ func TestPurgeSpace(t *testing.T) {
 						},
 					},
 				},
+				ServiceInstances: &mockServiceInstances{},
 			},
 			space: &resource.Space{
 				GUID: "space-1",
@@ -687,6 +829,7 @@ func TestPurgeSpace(t *testing.T) {
 				Applications: &mockApplications{
 					listAppsErr: listAppsErr,
 				},
+				ServiceInstances: &mockServiceInstances{},
 			},
 			space: &resource.Space{
 				GUID: "space-1",
@@ -706,6 +849,7 @@ func TestPurgeSpace(t *testing.T) {
 					},
 					deleteErr: deleteAppErr,
 				},
+				ServiceInstances: &mockServiceInstances{},
 			},
 			space: &resource.Space{
 				GUID: "space-1",
