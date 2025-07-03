@@ -152,13 +152,14 @@ func (m *mockMailSender) sendMail(
 }
 
 type mockServiceInstances struct {
+	listAllServiceInstances     []*resource.ServiceInstance
 	deleteServiceInstanceErr    error
 	getServiceInstanceErr       error
 	getServiceInstanceCallCount int
 }
 
 func (s *mockServiceInstances) ListAll(ctx context.Context, opts *client.ServiceInstanceListOptions) ([]*resource.ServiceInstance, error) {
-	return nil, nil
+	return s.listAllServiceInstances, nil
 }
 
 func (s *mockServiceInstances) Get(ctx context.Context, guid string) (*resource.ServiceInstance, error) {

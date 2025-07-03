@@ -781,6 +781,26 @@ func TestPurgeSpace(t *testing.T) {
 			},
 			expectedDeleteJobGUID: "delete-1",
 		},
+		"success with deletion of service instance": {
+			cfClient: &cfResourceClient{
+				Spaces: &mockSpaces{
+					deleteJobGUID: "delete-1",
+				},
+				Applications: &mockApplications{},
+				ServiceInstances: &mockServiceInstances{
+					listAllServiceInstances: []*resource.ServiceInstance{
+						{
+							GUID: "service-1",
+						},
+					},
+					getServiceInstanceErr: resource.NewNotFoundError(),
+				},
+			},
+			space: &resource.Space{
+				GUID: "space-1",
+			},
+			expectedDeleteJobGUID: "delete-1",
+		},
 		"error deleting space": {
 			cfClient: &cfResourceClient{
 				Spaces: &mockSpaces{
