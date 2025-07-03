@@ -24,6 +24,8 @@ type RolesClient interface {
 }
 
 type ServiceInstancesClient interface {
+	Delete(ctx context.Context, guid string) (string, error)
+	Get(ctx context.Context, guid string) (*resource.ServiceInstance, error)
 	ListAll(ctx context.Context, opts *client.ServiceInstanceListOptions) ([]*resource.ServiceInstance, error)
 }
 

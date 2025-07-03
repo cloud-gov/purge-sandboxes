@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/mail"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -151,12 +153,99 @@ func recreateSpaceDevsAndManagers(
 	return nil
 }
 
+func getRetrySettings() (int64, int64, error) {
+	var (
+		maxRetries int64
+		retryDelay int64
+		err        error
+	)
+
+	maxRetries = int64(60)
+	if val, ok := os.LookupEnv("MAX_CF_POLL_RETRIES"); ok {
+		maxRetries, err = strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return 0, 0, err
+		}
+	}
+
+	retryDelay = int64(60)
+	if val, ok := os.LookupEnv("CF_POLL_RETRY_DELAY"); ok {
+		retryDelay, err = strconv.ParseInt(val, 10, 64)
+		if err != nil {
+			return 0, 0, err
+		}
+	}
+
+	return maxRetries, retryDelay, nil
+}
+
+// Some services are deleted asynchronously, so initiate deletion and
+// wait for it to complete
+func waitForServiceInstanceDeletion(
+	ctx context.Context,
+	cfClient *cfResourceClient,
+	service *resource.ServiceInstance,
+	maxRetries int64,
+	retryDelay int64,
+) error {
+	_, err := cfClient.ServiceInstances.Delete(ctx, service.GUID)
+	if err != nil {
+		return err
+	}
+
+	attempts := int64(1)
+	isDeleted := false
+	for attempts <= maxRetries {
+		_, err := cfClient.ServiceInstances.Get(ctx, service.GUID)
+		if err != nil {
+			// If resource is not found, then it has been successfully deleted
+			if resource.IsNotFoundError(err) {
+				isDeleted = true
+				break
+			}
+
+			return err
+		}
+
+		time.Sleep(time.Duration(retryDelay) * time.Second)
+		attempts++
+	}
+
+	if !isDeleted {
+		return fmt.Errorf("could not verify deletion of %s", service.Name)
+	}
+
+	return nil
+}
+
 // purgeSpace deletes a space; if the delete fails, it deletes all applications within the space
 func purgeSpace(
 	ctx context.Context,
 	cfClient *cfResourceClient,
 	space *resource.Space,
 ) (string, error) {
+	services, err := cfClient.ServiceInstances.ListAll(ctx, &client.ServiceInstanceListOptions{
+		SpaceGUIDs: client.Filter{
+			Values: []string{space.GUID},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	maxRetries, retryDelay, err := getRetrySettings()
+	if err != nil {
+		return "", err
+	}
+
+	// Delete services
+	for _, service := range services {
+		err := waitForServiceInstanceDeletion(ctx, cfClient, service, maxRetries, retryDelay)
+		if err != nil {
+			return "", err
+		}
+	}
+
 	jobGUID, spaceErr := cfClient.Spaces.Delete(ctx, space.GUID)
 	if spaceErr != nil {
 		apps, err := cfClient.Applications.ListAll(ctx, &client.AppListOptions{
@@ -175,6 +264,7 @@ func purgeSpace(
 		}
 		return "", spaceErr
 	}
+
 	return jobGUID, spaceErr
 }
 
