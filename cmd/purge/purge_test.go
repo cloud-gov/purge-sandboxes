@@ -131,6 +131,7 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 				Jobs: &mockJobs{
 					expectedJobGUID: "delete-space-1",
 				},
+				ServiceInstances: &mockServiceInstances{},
 			},
 			userGUIDs: map[string]bool{
 				"user-1": true,
@@ -249,6 +250,7 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 				Jobs: &mockJobs{
 					expectedJobGUID: "space-delete-1",
 				},
+				ServiceInstances: &mockServiceInstances{},
 			},
 			userGUIDs: map[string]bool{
 				"user-1": true,
@@ -374,6 +376,7 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 				Jobs: &mockJobs{
 					expectedJobGUID: "space-delete-1",
 				},
+				ServiceInstances: &mockServiceInstances{},
 			},
 			userGUIDs: map[string]bool{
 				"user-1": true,

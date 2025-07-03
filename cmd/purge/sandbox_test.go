@@ -773,7 +773,8 @@ func TestPurgeSpace(t *testing.T) {
 				Spaces: &mockSpaces{
 					deleteJobGUID: "delete-1",
 				},
-				Applications: &mockApplications{},
+				Applications:     &mockApplications{},
+				ServiceInstances: &mockServiceInstances{},
 			},
 			space: &resource.Space{
 				GUID: "space-1",
@@ -792,6 +793,7 @@ func TestPurgeSpace(t *testing.T) {
 						},
 					},
 				},
+				ServiceInstances: &mockServiceInstances{},
 			},
 			space: &resource.Space{
 				GUID: "space-1",
@@ -807,6 +809,7 @@ func TestPurgeSpace(t *testing.T) {
 				Applications: &mockApplications{
 					listAppsErr: listAppsErr,
 				},
+				ServiceInstances: &mockServiceInstances{},
 			},
 			space: &resource.Space{
 				GUID: "space-1",
@@ -826,6 +829,7 @@ func TestPurgeSpace(t *testing.T) {
 					},
 					deleteErr: deleteAppErr,
 				},
+				ServiceInstances: &mockServiceInstances{},
 			},
 			space: &resource.Space{
 				GUID: "space-1",
