@@ -204,7 +204,7 @@ func waitForServiceInstanceDeletion(
 		_, err := cfClient.ServiceInstances.Get(ctx, service.GUID)
 		if err != nil {
 			// If resource is not found, then it has been successfully deleted
-			if resource.IsNotFoundError(err) {
+			if resource.IsResourceNotFoundError(err) {
 				isDeleted = true
 				break
 			}
