@@ -11,6 +11,10 @@ import (
 )
 
 func TestListRecipients(t *testing.T) {
+	email1 := "foo1@bar.gov"
+	email2 := "foo2@bar.gov"
+	email3 := "foo3@bar.gov"
+	emptyUsername := ""
 	testCases := map[string]struct {
 		userGUIDs          map[string]bool
 		users              []*resource.User
@@ -23,18 +27,30 @@ func TestListRecipients(t *testing.T) {
 				"user-2": true,
 			},
 			users: []*resource.User{
-				{GUID: "user-1", Username: "foo1@bar.gov"},
-				{GUID: "user-2", Username: "foo2@bar.gov"},
-				{GUID: "user-3", Username: "foo3@bar.gov"},
+				{Resource: resource.Resource{GUID: "user-1"}, Username: &email1},
+				{Resource: resource.Resource{GUID: "user-2"}, Username: &email2},
+				{Resource: resource.Resource{GUID: "user-3"}, Username: &email3},
 			},
-			expectedRecipients: []string{"foo1@bar.gov", "foo2@bar.gov"},
+			expectedRecipients: []string{email1, email2},
+		},
+		"returns error for nil username": {
+			userGUIDs: map[string]bool{
+				"user-1": true,
+			},
+			users: []*resource.User{
+				{Resource: resource.Resource{GUID: "user-1"}},
+			},
+			expectedErr: "username is required",
 		},
 		"returns error for missing username": {
 			userGUIDs: map[string]bool{
 				"user-1": true,
 			},
 			users: []*resource.User{
-				{GUID: "user-1"},
+				{
+					Resource: resource.Resource{GUID: "user-1"},
+					Username: &emptyUsername,
+				},
 			},
 			expectedErr: "mail: no address",
 		},
@@ -53,6 +69,8 @@ func TestListRecipients(t *testing.T) {
 }
 
 func TestListSpaceDevsAndManagers(t *testing.T) {
+	email1 := "foo1@bar.gov"
+	email2 := "foo2@bar.gov"
 	testCases := map[string]struct {
 		userGUIDs        map[string]bool
 		roles            []*resource.Role
@@ -68,12 +86,12 @@ func TestListSpaceDevsAndManagers(t *testing.T) {
 			},
 			users: []*resource.User{
 				{
-					GUID:     "user-1",
-					Username: "foo1@bar.gov",
+					Resource: resource.Resource{GUID: "user-1"},
+					Username: &email1,
 				},
 				{
-					GUID:     "user-2",
-					Username: "foo2@bar.gov",
+					Resource: resource.Resource{GUID: "user-2"},
+					Username: &email2,
 				},
 			},
 			roles: []*resource.Role{
@@ -111,17 +129,17 @@ func TestListSpaceDevsAndManagers(t *testing.T) {
 			expectedDevs: []spaceUser{
 				{
 					GUID:     "user-1",
-					Username: "foo1@bar.gov",
+					Username: email1,
 				},
 				{
 					GUID:     "user-2",
-					Username: "foo2@bar.gov",
+					Username: email2,
 				},
 			},
 			expectedManagers: []spaceUser{
 				{
 					GUID:     "user-1",
-					Username: "foo1@bar.gov",
+					Username: email1,
 				},
 			},
 		},
@@ -131,12 +149,12 @@ func TestListSpaceDevsAndManagers(t *testing.T) {
 			},
 			users: []*resource.User{
 				{
-					GUID:     "user-1",
-					Username: "foo1@bar.gov",
+					Resource: resource.Resource{GUID: "user-1"},
+					Username: &email1,
 				},
 				{
-					GUID:     "user-2",
-					Username: "foo2@bar.gov",
+					Resource: resource.Resource{GUID: "user-2"},
+					Username: &email2,
 				},
 			},
 			roles: []*resource.Role{
@@ -164,7 +182,7 @@ func TestListSpaceDevsAndManagers(t *testing.T) {
 			expectedDevs: []spaceUser{
 				{
 					GUID:     "user-1",
-					Username: "foo1@bar.gov",
+					Username: email1,
 				},
 			},
 			expectedManagers: []spaceUser{},
@@ -176,8 +194,8 @@ func TestListSpaceDevsAndManagers(t *testing.T) {
 			},
 			users: []*resource.User{
 				{
-					GUID:     "user-1",
-					Username: "foo1@bar.gov",
+					Resource: resource.Resource{GUID: "user-1"},
+					Username: &email1,
 				},
 			},
 			roles: []*resource.Role{
@@ -205,7 +223,7 @@ func TestListSpaceDevsAndManagers(t *testing.T) {
 			expectedDevs: []spaceUser{
 				{
 					GUID:     "user-1",
-					Username: "foo1@bar.gov",
+					Username: email1,
 				},
 			},
 			expectedManagers: []spaceUser{},
@@ -241,7 +259,9 @@ func TestListPurgeSpaces(t *testing.T) {
 	}{
 		"skips empty spaces": {
 			spaces: []*resource.Space{
-				{GUID: "space-guid"},
+				{
+					Resource: resource.Resource{GUID: "space-guid"},
+				},
 			},
 			now: now.Truncate(24 * time.Hour),
 			opts: Options{
@@ -252,20 +272,21 @@ func TestListPurgeSpaces(t *testing.T) {
 		},
 		"skips spaces with recent resources": {
 			spaces: []*resource.Space{
-				{GUID: "space-guid"},
+				{
+					Resource: resource.Resource{GUID: "space-guid"},
+				},
 			},
 			now: now.Truncate(24 * time.Hour),
 			apps: []*resource.App{
 				{
-					GUID: "app-guid",
-					Relationships: resource.SpaceRelationship{
+					Resource: resource.Resource{GUID: "app-guid", CreatedAt: now.Add(-15 * 24 * time.Hour)},
+					Relationships: resource.AppRelationships{
 						Space: resource.ToOneRelationship{
 							Data: &resource.Relationship{
 								GUID: "space-guid",
 							},
 						},
 					},
-					CreatedAt: now.Add(-15 * 24 * time.Hour),
 				},
 			},
 			opts: Options{
@@ -276,20 +297,21 @@ func TestListPurgeSpaces(t *testing.T) {
 		},
 		"notifies on spaces between thresholds": {
 			spaces: []*resource.Space{
-				{GUID: "space-guid"},
+				{
+					Resource: resource.Resource{GUID: "space-guid"},
+				},
 			},
 			now: now.Truncate(24 * time.Hour),
 			apps: []*resource.App{
 				{
-					GUID: "app-guid",
-					Relationships: resource.SpaceRelationship{
+					Resource: resource.Resource{GUID: "app-guid", CreatedAt: now.Add(-28 * 24 * time.Hour)},
+					Relationships: resource.AppRelationships{
 						Space: resource.ToOneRelationship{
 							Data: &resource.Relationship{
 								GUID: "space-guid",
 							},
 						},
 					},
-					CreatedAt: now.Add(-28 * 24 * time.Hour),
 				},
 			},
 			opts: Options{
@@ -301,27 +323,28 @@ func TestListPurgeSpaces(t *testing.T) {
 				{
 					Timestamp: now.Add(-28 * 24 * time.Hour).Truncate(24 * time.Hour),
 					Space: &resource.Space{
-						GUID: "space-guid",
+						Resource: resource.Resource{GUID: "space-guid"},
 					},
 				},
 			},
 		},
 		"notifies on the notify threshold": {
 			spaces: []*resource.Space{
-				{GUID: "space-guid"},
+				{
+					Resource: resource.Resource{GUID: "space-guid"},
+				},
 			},
 			now: now.Truncate(24 * time.Hour),
 			apps: []*resource.App{
 				{
-					GUID: "app-guid",
-					Relationships: resource.SpaceRelationship{
+					Resource: resource.Resource{GUID: "app-guid", CreatedAt: now.Add(-25 * 24 * time.Hour)},
+					Relationships: resource.AppRelationships{
 						Space: resource.ToOneRelationship{
 							Data: &resource.Relationship{
 								GUID: "space-guid",
 							},
 						},
 					},
-					CreatedAt: now.Add(-25 * 24 * time.Hour),
 				},
 			},
 			opts: Options{
@@ -333,27 +356,28 @@ func TestListPurgeSpaces(t *testing.T) {
 				{
 					Timestamp: now.Add(-25 * 24 * time.Hour).Truncate(24 * time.Hour),
 					Space: &resource.Space{
-						GUID: "space-guid",
+						Resource: resource.Resource{GUID: "space-guid"},
 					},
 				},
 			},
 		},
 		"purges on the purge threshold": {
 			spaces: []*resource.Space{
-				{GUID: "space-guid"},
+				{
+					Resource: resource.Resource{GUID: "space-guid"},
+				},
 			},
 			now: now.Truncate(24 * time.Hour),
 			apps: []*resource.App{
 				{
-					GUID: "app-guid",
-					Relationships: resource.SpaceRelationship{
+					Resource: resource.Resource{GUID: "app-guid", CreatedAt: now.Add(-30 * 24 * time.Hour)},
+					Relationships: resource.AppRelationships{
 						Space: resource.ToOneRelationship{
 							Data: &resource.Relationship{
 								GUID: "space-guid",
 							},
 						},
 					},
-					CreatedAt: now.Add(-30 * 24 * time.Hour),
 				},
 			},
 			opts: Options{
@@ -365,27 +389,28 @@ func TestListPurgeSpaces(t *testing.T) {
 				{
 					Timestamp: now.Add(-30 * 24 * time.Hour).Truncate(24 * time.Hour),
 					Space: &resource.Space{
-						GUID: "space-guid",
+						Resource: resource.Resource{GUID: "space-guid"},
 					},
 				},
 			},
 		},
 		"purges after the purge threshold": {
 			spaces: []*resource.Space{
-				{GUID: "space-guid"},
+				{
+					Resource: resource.Resource{GUID: "space-guid"},
+				},
 			},
 			now: now.Truncate(24 * time.Hour),
 			apps: []*resource.App{
 				{
-					GUID: "app-guid",
-					Relationships: resource.SpaceRelationship{
+					Resource: resource.Resource{GUID: "app-guid", CreatedAt: now.Add(-31 * 24 * time.Hour)},
+					Relationships: resource.AppRelationships{
 						Space: resource.ToOneRelationship{
 							Data: &resource.Relationship{
 								GUID: "space-guid",
 							},
 						},
 					},
-					CreatedAt: now.Add(-31 * 24 * time.Hour),
 				},
 			},
 			opts: Options{
@@ -397,27 +422,28 @@ func TestListPurgeSpaces(t *testing.T) {
 				{
 					Timestamp: now.Add(-31 * 24 * time.Hour).Truncate(24 * time.Hour),
 					Space: &resource.Space{
-						GUID: "space-guid",
+						Resource: resource.Resource{GUID: "space-guid"},
 					},
 				},
 			},
 		},
 		"purges after the purge threshold when time starts in the past": {
 			spaces: []*resource.Space{
-				{GUID: "space-guid"},
+				{
+					Resource: resource.Resource{GUID: "space-guid"},
+				},
 			},
 			now: now.Truncate(24 * time.Hour),
 			apps: []*resource.App{
 				{
-					GUID: "app-guid",
-					Relationships: resource.SpaceRelationship{
+					Resource: resource.Resource{GUID: "app-guid", CreatedAt: now.Add(-31 * 24 * time.Hour)},
+					Relationships: resource.AppRelationships{
 						Space: resource.ToOneRelationship{
 							Data: &resource.Relationship{
 								GUID: "space-guid",
 							},
 						},
 					},
-					CreatedAt: now.Add(-31 * 24 * time.Hour),
 				},
 			},
 			opts: Options{
@@ -429,27 +455,28 @@ func TestListPurgeSpaces(t *testing.T) {
 				{
 					Timestamp: now.Add(-31 * 24 * time.Hour).Truncate(24 * time.Hour),
 					Space: &resource.Space{
-						GUID: "space-guid",
+						Resource: resource.Resource{GUID: "space-guid"},
 					},
 				},
 			},
 		},
 		"skips purge when time starts after last timestamp": {
 			spaces: []*resource.Space{
-				{GUID: "space-guid"},
+				{
+					Resource: resource.Resource{GUID: "space-guid"},
+				},
 			},
 			now: now.Truncate(24 * time.Hour),
 			apps: []*resource.App{
 				{
-					GUID: "app-guid",
-					Relationships: resource.SpaceRelationship{
+					Resource: resource.Resource{GUID: "app-guid", CreatedAt: now.Add(-31 * 24 * time.Hour)},
+					Relationships: resource.AppRelationships{
 						Space: resource.ToOneRelationship{
 							Data: &resource.Relationship{
 								GUID: "space-guid",
 							},
 						},
 					},
-					CreatedAt: now.Add(-31 * 24 * time.Hour),
 				},
 			},
 			opts: Options{
@@ -460,20 +487,19 @@ func TestListPurgeSpaces(t *testing.T) {
 		},
 		"notifies when purge is disabled even if time is past purge threshold": {
 			spaces: []*resource.Space{
-				{GUID: "space-guid"},
+				{Resource: resource.Resource{GUID: "space-guid"}},
 			},
 			now: now.Truncate(24 * time.Hour),
 			apps: []*resource.App{
 				{
-					GUID: "app-guid",
-					Relationships: resource.SpaceRelationship{
+					Resource: resource.Resource{GUID: "app-guid", CreatedAt: now.Add(-31 * 24 * time.Hour)},
+					Relationships: resource.AppRelationships{
 						Space: resource.ToOneRelationship{
 							Data: &resource.Relationship{
 								GUID: "space-guid",
 							},
 						},
 					},
-					CreatedAt: now.Add(-31 * 24 * time.Hour),
 				},
 			},
 			opts: Options{
@@ -486,27 +512,28 @@ func TestListPurgeSpaces(t *testing.T) {
 				{
 					Timestamp: now.Add(-31 * 24 * time.Hour).Truncate(24 * time.Hour),
 					Space: &resource.Space{
-						GUID: "space-guid",
+						Resource: resource.Resource{GUID: "space-guid"},
 					},
 				},
 			},
 		},
 		"does not notify or purge when purge is disabled if time is past purge threshold but not notify threshold": {
 			spaces: []*resource.Space{
-				{GUID: "space-guid"},
+				{
+					Resource: resource.Resource{GUID: "space-guid"},
+				},
 			},
 			now: now.Truncate(24 * time.Hour),
 			apps: []*resource.App{
 				{
-					GUID: "app-guid",
-					Relationships: resource.SpaceRelationship{
+					Resource: resource.Resource{GUID: "app-guid", CreatedAt: now.Add(-26 * 24 * time.Hour)},
+					Relationships: resource.AppRelationships{
 						Space: resource.ToOneRelationship{
 							Data: &resource.Relationship{
 								GUID: "space-guid",
 							},
 						},
 					},
-					CreatedAt: now.Add(-26 * 24 * time.Hour),
 				},
 			},
 			opts: Options{
@@ -542,6 +569,9 @@ func TestListPurgeSpaces(t *testing.T) {
 
 func TestGetFirstResource(t *testing.T) {
 	now := time.Now()
+	ten_days_ago := now.Add(-10 * 24 * time.Hour)
+	five_days_ago := now.Add(-5 * 24 * time.Hour)
+
 	testCases := map[string]struct {
 		space                 *resource.Space
 		apps                  []*resource.App
@@ -551,29 +581,28 @@ func TestGetFirstResource(t *testing.T) {
 	}{
 		"skips empty spaces": {
 			space: &resource.Space{
-				GUID: "space-guid",
+				Resource: resource.Resource{GUID: "space-guid"},
 			},
 		},
 		"returns the timestamp of the earliest app": {
 			space: &resource.Space{
-				GUID: "space-guid",
+				Resource: resource.Resource{GUID: "space-guid"},
 			},
 			apps: []*resource.App{
 				{
-					GUID: "app-guid",
-					Relationships: resource.SpaceRelationship{
+					Resource: resource.Resource{GUID: "app-guid", CreatedAt: ten_days_ago},
+					Relationships: resource.AppRelationships{
 						Space: resource.ToOneRelationship{
 							Data: &resource.Relationship{
 								GUID: "space-guid",
 							},
 						},
 					},
-					CreatedAt: now.Add(-10 * 24 * time.Hour),
 				},
 			},
 			instances: []*resource.ServiceInstance{
 				{
-					GUID: "instance-guid",
+					Resource: resource.Resource{GUID: "instance-guid", CreatedAt: five_days_ago},
 					Relationships: resource.ServiceInstanceRelationships{
 						Space: &resource.ToOneRelationship{
 							Data: &resource.Relationship{
@@ -581,31 +610,29 @@ func TestGetFirstResource(t *testing.T) {
 							},
 						},
 					},
-					CreatedAt: now.Add(-5 * 24 * time.Hour),
 				},
 			},
-			expectedFirstResource: now.Add(-10 * 24 * time.Hour),
+			expectedFirstResource: ten_days_ago,
 		},
 		"returns the timestamp of the earliest instance": {
 			space: &resource.Space{
-				GUID: "space-guid",
+				Resource: resource.Resource{GUID: "space-guid"},
 			},
 			apps: []*resource.App{
 				{
-					GUID: "app-guid",
-					Relationships: resource.SpaceRelationship{
+					Resource: resource.Resource{GUID: "app-guid", CreatedAt: five_days_ago},
+					Relationships: resource.AppRelationships{
 						Space: resource.ToOneRelationship{
 							Data: &resource.Relationship{
 								GUID: "space-guid",
 							},
 						},
 					},
-					CreatedAt: now.Add(-5 * 24 * time.Hour),
 				},
 			},
 			instances: []*resource.ServiceInstance{
 				{
-					GUID: "instance-guid",
+					Resource: resource.Resource{GUID: "instance-guid", CreatedAt: ten_days_ago},
 					Relationships: resource.ServiceInstanceRelationships{
 						Space: &resource.ToOneRelationship{
 							Data: &resource.Relationship{
@@ -613,15 +640,14 @@ func TestGetFirstResource(t *testing.T) {
 							},
 						},
 					},
-					CreatedAt: now.Add(-10 * 24 * time.Hour),
 				},
 			},
-			expectedFirstResource: now.Add(-10 * 24 * time.Hour),
+			expectedFirstResource: ten_days_ago,
 		},
 	}
 	for name, test := range testCases {
 		t.Run(name, func(t *testing.T) {
-			firstResource, err := letFirstResource(
+			firstResource, err := getFirstResource(
 				test.space,
 				test.apps,
 				test.instances,
@@ -685,7 +711,7 @@ func TestWaitForServiceDeletion(t *testing.T) {
 				},
 			},
 			service: &resource.ServiceInstance{
-				GUID: "service-1",
+				Resource: resource.Resource{GUID: "service-1"},
 			},
 			maxRetries:                          1,
 			retryDelay:                          0,
@@ -698,7 +724,7 @@ func TestWaitForServiceDeletion(t *testing.T) {
 				},
 			},
 			service: &resource.ServiceInstance{
-				GUID: "service-1",
+				Resource: resource.Resource{GUID: "service-1"},
 			},
 			maxRetries: 1,
 			retryDelay: 0,
@@ -711,7 +737,7 @@ func TestWaitForServiceDeletion(t *testing.T) {
 				},
 			},
 			service: &resource.ServiceInstance{
-				GUID: "service-1",
+				Resource: resource.Resource{GUID: "service-1"},
 			},
 			maxRetries:                          1,
 			retryDelay:                          0,
@@ -723,7 +749,7 @@ func TestWaitForServiceDeletion(t *testing.T) {
 				ServiceInstances: &mockServiceInstances{},
 			},
 			service: &resource.ServiceInstance{
-				GUID: "service-1",
+				Resource: resource.Resource{GUID: "service-1"},
 			},
 			maxRetries:                          5,
 			retryDelay:                          0,
@@ -777,7 +803,7 @@ func TestPurgeSpace(t *testing.T) {
 				ServiceInstances: &mockServiceInstances{},
 			},
 			space: &resource.Space{
-				GUID: "space-1",
+				Resource: resource.Resource{GUID: "space-1"},
 			},
 			expectedDeleteJobGUID: "delete-1",
 		},
@@ -790,14 +816,14 @@ func TestPurgeSpace(t *testing.T) {
 				ServiceInstances: &mockServiceInstances{
 					listAllServiceInstances: []*resource.ServiceInstance{
 						{
-							GUID: "service-1",
+							Resource: resource.Resource{GUID: "service-1"},
 						},
 					},
 					getServiceInstanceErr: resource.NewNotFoundError(),
 				},
 			},
 			space: &resource.Space{
-				GUID: "space-1",
+				Resource: resource.Resource{GUID: "space-1"},
 			},
 			expectedDeleteJobGUID: "delete-1",
 		},
@@ -809,14 +835,14 @@ func TestPurgeSpace(t *testing.T) {
 				Applications: &mockApplications{
 					apps: []*resource.App{
 						{
-							GUID: "app-1",
+							Resource: resource.Resource{GUID: "app-1"},
 						},
 					},
 				},
 				ServiceInstances: &mockServiceInstances{},
 			},
 			space: &resource.Space{
-				GUID: "space-1",
+				Resource: resource.Resource{GUID: "space-1"},
 			},
 			expectedErr:           deleteSpaceErr,
 			expectDeleteCallCount: 1,
@@ -832,7 +858,7 @@ func TestPurgeSpace(t *testing.T) {
 				ServiceInstances: &mockServiceInstances{},
 			},
 			space: &resource.Space{
-				GUID: "space-1",
+				Resource: resource.Resource{GUID: "space-1"},
 			},
 			expectedErr: listAppsErr,
 		},
@@ -844,7 +870,7 @@ func TestPurgeSpace(t *testing.T) {
 				Applications: &mockApplications{
 					apps: []*resource.App{
 						{
-							GUID: "app-1",
+							Resource: resource.Resource{GUID: "app-1"},
 						},
 					},
 					deleteErr: deleteAppErr,
@@ -852,7 +878,7 @@ func TestPurgeSpace(t *testing.T) {
 				ServiceInstances: &mockServiceInstances{},
 			},
 			space: &resource.Space{
-				GUID: "space-1",
+				Resource: resource.Resource{GUID: "space-1"},
 			},
 			expectDeleteCallCount: 1,
 			expectedErr:           deleteAppErr,

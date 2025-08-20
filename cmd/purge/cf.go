@@ -66,11 +66,7 @@ func newCFClient(
 	cfApiClientId string,
 	cfApiClientSecret string,
 ) (*cfResourceClient, error) {
-	cfg, err := config.NewClientSecret(
-		cfApiUrl,
-		cfApiClientId,
-		cfApiClientSecret,
-	)
+	cfg, err := config.New(cfApiUrl, config.ClientCredentials(cfApiClientId, cfApiClientSecret))
 	if err != nil {
 		return nil, err
 	}

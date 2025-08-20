@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/mail"
@@ -30,10 +31,14 @@ func listRecipients(
 			continue
 		}
 
-		if _, err := mail.ParseAddress(user.Username); err != nil {
+		if user.Username == nil {
+			return nil, errors.New("username is required")
+		}
+
+		if _, err := mail.ParseAddress(*user.Username); err != nil {
 			return nil, err
 		}
-		addresses = append(addresses, user.Username)
+		addresses = append(addresses, *user.Username)
 	}
 	return addresses, nil
 }
@@ -62,7 +67,7 @@ func listSpaceDevsAndManagers(
 			}
 			for _, spaceUser := range spaceUsers {
 				if spaceUser.GUID == roleUserGUID {
-					usernamesMap[roleUserGUID] = spaceUser.Username
+					usernamesMap[roleUserGUID] = *spaceUser.Username
 					username = usernamesMap[roleUserGUID]
 				}
 			}
@@ -325,8 +330,8 @@ func listOrgResources(
 	return
 }
 
-// letFirstResource gets the creation timestamp of the earliest-created resource in a space
-func letFirstResource(
+// getFirstResource gets the creation timestamp of the earliest-created resource in a space
+func getFirstResource(
 	space *resource.Space,
 	apps []*resource.App,
 	instances []*resource.ServiceInstance,
@@ -334,19 +339,19 @@ func letFirstResource(
 	groupedApps := groupAppsBySpace(apps)
 	groupedInstances := groupInstancesBySpace(instances)
 
-	var firstResource time.Time
+	var firstResourceCreatedAt time.Time
 	for _, app := range groupedApps[space.GUID] {
-		if firstResource.IsZero() || app.CreatedAt.Before(firstResource) {
-			firstResource = app.CreatedAt
+		if firstResourceCreatedAt.IsZero() || app.CreatedAt.Before(firstResourceCreatedAt) {
+			firstResourceCreatedAt = app.CreatedAt
 		}
 	}
 	for _, instance := range groupedInstances[space.GUID] {
-		if firstResource.IsZero() || instance.CreatedAt.Before(firstResource) {
-			firstResource = instance.CreatedAt
+		if firstResourceCreatedAt.IsZero() || instance.CreatedAt.Before(firstResourceCreatedAt) {
+			firstResourceCreatedAt = instance.CreatedAt
 		}
 	}
 
-	return firstResource, nil
+	return firstResourceCreatedAt, nil
 }
 
 // SpaceDetails describes a space and its first resource creation time
@@ -370,7 +375,7 @@ func listPurgeSpaces(
 ) {
 	var firstResource time.Time
 	for _, space := range spaces {
-		firstResource, err = letFirstResource(space, apps, instances)
+		firstResource, err = getFirstResource(space, apps, instances)
 		if err != nil {
 			return
 		}

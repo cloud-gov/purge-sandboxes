@@ -60,6 +60,9 @@ func TestWaitForSpaceDeletion(t *testing.T) {
 }
 
 func TestPurgeAndRecreateSpace(t *testing.T) {
+	email := "foo@bar.gov"
+	email2 := "foo2@bar.gov"
+
 	testCases := map[string]struct {
 		cfClient                *cfResourceClient
 		userGUIDs               map[string]bool
@@ -92,8 +95,10 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 					},
 					users: []*resource.User{
 						{
-							GUID:     "user-1",
-							Username: "foo@bar.gov",
+							Resource: resource.Resource{
+								GUID: "user-1",
+							},
+							Username: &email,
 						},
 					},
 				},
@@ -101,8 +106,10 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 					spaceGUID: "space-1-guid",
 					users: []*resource.User{
 						{
-							GUID:     "user-1",
-							Username: "foo@bar.gov",
+							Resource: resource.Resource{
+								GUID: "user-1",
+							},
+							Username: &email,
 						},
 					},
 					expectedSpaceCreateRequest: &resource.SpaceCreate{
@@ -116,7 +123,9 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 						},
 					},
 					space: &resource.Space{
-						GUID: "new-space-1-guid",
+						Resource: resource.Resource{
+							GUID: "new-space-1-guid",
+						},
 						Name: "space-1",
 					},
 					deleteJobGUID: "delete-space-1",
@@ -125,7 +134,9 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 					orgGUID:        "org-1",
 					spaceQuotaName: "quota-1",
 					quota: &resource.SpaceQuota{
-						GUID: "quota-guid-1",
+						Resource: resource.Resource{
+							GUID: "quota-guid-1",
+						},
 					},
 				},
 				Jobs: &mockJobs{
@@ -141,11 +152,15 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 				SandboxQuotaName: "quota-1",
 			},
 			organization: &resource.Organization{
-				GUID: "org-1",
+				Resource: resource.Resource{
+					GUID: "org-1",
+				},
 			},
 			spaceDetails: SpaceDetails{
 				Space: &resource.Space{
-					GUID: "space-1-guid",
+					Resource: resource.Resource{
+						GUID: "space-1-guid",
+					},
 					Name: "space-1",
 					Relationships: &resource.SpaceRelationships{
 						Organization: &resource.ToOneRelationship{
@@ -203,12 +218,16 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 					},
 					users: []*resource.User{
 						{
-							GUID:     "user-1",
-							Username: "foo@bar.gov",
+							Resource: resource.Resource{
+								GUID: "user-1",
+							},
+							Username: &email,
 						},
 						{
-							GUID:     "user-2",
-							Username: "foo2@bar.gov",
+							Resource: resource.Resource{
+								GUID: "user-2",
+							},
+							Username: &email2,
 						},
 					},
 				},
@@ -216,12 +235,16 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 					spaceGUID: "space-1-guid",
 					users: []*resource.User{
 						{
-							GUID:     "user-1",
-							Username: "foo@bar.gov",
+							Resource: resource.Resource{
+								GUID: "user-1",
+							},
+							Username: &email,
 						},
 						{
-							GUID:     "user-2",
-							Username: "foo2@bar.gov",
+							Resource: resource.Resource{
+								GUID: "user-2",
+							},
+							Username: &email2,
 						},
 					},
 					expectedSpaceCreateRequest: &resource.SpaceCreate{
@@ -235,7 +258,9 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 						},
 					},
 					space: &resource.Space{
-						GUID: "new-space-1-guid",
+						Resource: resource.Resource{
+							GUID: "new-space-1-guid",
+						},
 						Name: "space-1",
 					},
 					deleteJobGUID: "space-delete-1",
@@ -244,7 +269,9 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 					orgGUID:        "org-1",
 					spaceQuotaName: "quota-1",
 					quota: &resource.SpaceQuota{
-						GUID: "quota-guid-1",
+						Resource: resource.Resource{
+							GUID: "quota-guid-1",
+						},
 					},
 				},
 				Jobs: &mockJobs{
@@ -261,11 +288,15 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 				SandboxQuotaName: "quota-1",
 			},
 			organization: &resource.Organization{
-				GUID: "org-1",
+				Resource: resource.Resource{
+					GUID: "org-1",
+				},
 			},
 			spaceDetails: SpaceDetails{
 				Space: &resource.Space{
-					GUID: "space-1-guid",
+					Resource: resource.Resource{
+						GUID: "space-1-guid",
+					},
 					Name: "space-1",
 					Relationships: &resource.SpaceRelationships{
 						Organization: &resource.ToOneRelationship{
@@ -328,12 +359,16 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 					},
 					users: []*resource.User{
 						{
-							GUID:     "user-1",
-							Username: "foo@bar.gov",
+							Resource: resource.Resource{
+								GUID: "user-1",
+							},
+							Username: &email,
 						},
 						{
-							GUID:     "user-2",
-							Username: "foo2@bar.gov",
+							Resource: resource.Resource{
+								GUID: "user-2",
+							},
+							Username: &email2,
 						},
 					},
 				},
@@ -341,12 +376,16 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 					spaceGUID: "space-1-guid",
 					users: []*resource.User{
 						{
-							GUID:     "user-1",
-							Username: "foo@bar.gov",
+							Resource: resource.Resource{
+								GUID: "user-1",
+							},
+							Username: &email,
 						},
 						{
-							GUID:     "user-2",
-							Username: "foo2@bar.gov",
+							Resource: resource.Resource{
+								GUID: "user-2",
+							},
+							Username: &email2,
 						},
 					},
 					expectedSpaceCreateRequest: &resource.SpaceCreate{
@@ -360,7 +399,9 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 						},
 					},
 					space: &resource.Space{
-						GUID: "new-space-1-guid",
+						Resource: resource.Resource{
+							GUID: "new-space-1-guid",
+						},
 						Name: "space-1",
 					},
 					deleteJobGUID: "space-delete-1",
@@ -370,7 +411,9 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 					orgGUID:        "org-1",
 					quota: &resource.SpaceQuota{
 						Name: "quota-1",
-						GUID: "quota-guid-1",
+						Resource: resource.Resource{
+							GUID: "quota-guid-1",
+						},
 					},
 				},
 				Jobs: &mockJobs{
@@ -387,11 +430,15 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 				SandboxQuotaName: "quota-1",
 			},
 			organization: &resource.Organization{
-				GUID: "org-1",
+				Resource: resource.Resource{
+					GUID: "org-1",
+				},
 			},
 			spaceDetails: SpaceDetails{
 				Space: &resource.Space{
-					GUID: "space-1-guid",
+					Resource: resource.Resource{
+						GUID: "space-1-guid",
+					},
 					Name: "space-1",
 					Relationships: &resource.SpaceRelationships{
 						Organization: &resource.ToOneRelationship{
