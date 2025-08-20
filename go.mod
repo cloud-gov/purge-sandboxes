@@ -5,7 +5,7 @@ go 1.23.0
 toolchain go1.23.7
 
 require (
-	github.com/cloudfoundry-community/go-cfclient/v3 v3.0.0-alpha.6
+	github.com/cloudfoundry/go-cfclient/v3 v3.0.0-alpha.13
 	github.com/google/go-cmp v0.6.0
 	github.com/sethvargo/go-envconfig v1.0.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
@@ -18,9 +18,8 @@ require (
 	github.com/martini-contrib/render v0.0.0-20150707142108-ec18f8345a11 // indirect
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/stretchr/testify v1.8.4 // indirect
-	golang.org/x/net v0.38.0 // indirect
-	golang.org/x/oauth2 v0.27.0 // indirect
+	github.com/stretchr/testify v1.10.0 // indirect
+	golang.org/x/oauth2 v0.30.0 // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

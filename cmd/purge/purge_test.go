@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/cloudfoundry-community/go-cfclient/v3/resource"
+	"github.com/cloudfoundry/go-cfclient/v3/resource"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 )

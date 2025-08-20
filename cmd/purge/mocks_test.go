@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/cloudfoundry-community/go-cfclient/v3/client"
-	"github.com/cloudfoundry-community/go-cfclient/v3/resource"
+	"github.com/cloudfoundry/go-cfclient/v3/client"
+	"github.com/cloudfoundry/go-cfclient/v3/resource"
 	"github.com/google/go-cmp/cmp"
 )
 
