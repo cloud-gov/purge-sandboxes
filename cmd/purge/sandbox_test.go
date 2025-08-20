@@ -707,7 +707,7 @@ func TestWaitForServiceDeletion(t *testing.T) {
 		"success": {
 			cfClient: &cfResourceClient{
 				ServiceInstances: &mockServiceInstances{
-					getServiceInstanceErr: resource.NewNotFoundError(),
+					getServiceInstanceErr: resource.NewResourceNotFoundError(),
 				},
 			},
 			service: &resource.ServiceInstance{
@@ -819,7 +819,7 @@ func TestPurgeSpace(t *testing.T) {
 							Resource: resource.Resource{GUID: "service-1"},
 						},
 					},
-					getServiceInstanceErr: resource.NewNotFoundError(),
+					getServiceInstanceErr: resource.NewResourceNotFoundError(),
 				},
 			},
 			space: &resource.Space{
