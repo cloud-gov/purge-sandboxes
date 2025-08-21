@@ -50,7 +50,7 @@ func main() {
 	}
 
 	// Build filter of users with email addresses (not service accounts)
-	userGUIDs, err := getAllUsersWithEmails(ctx, cfClient)
+	userGUIDs, err := getValidUsersMap(ctx, cfClient)
 	if err != nil {
 		log.Fatalf("error getting users: %s", err.Error())
 	}

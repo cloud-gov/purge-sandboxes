@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-func getAllUsersWithEmails(
+func getValidUsersMap(
 	ctx context.Context,
 	cfClient *cfResourceClient,
 ) (map[string]bool, error) {
@@ -14,11 +14,11 @@ func getAllUsersWithEmails(
 	if err != nil {
 		return nil, fmt.Errorf("error getting users: %s", err.Error())
 	}
-	userGUIDs := map[string]bool{}
+	validUsersMap := map[string]bool{}
 	for _, user := range users {
 		if user.Username != nil && strings.Contains(*user.Username, "@") {
-			userGUIDs[user.GUID] = true
+			validUsersMap[user.GUID] = true
 		}
 	}
-	return userGUIDs, nil
+	return validUsersMap, nil
 }

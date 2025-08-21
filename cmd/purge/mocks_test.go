@@ -170,3 +170,12 @@ func (s *mockServiceInstances) Get(ctx context.Context, guid string) (*resource.
 func (s *mockServiceInstances) Delete(ctx context.Context, guid string) (string, error) {
 	return "", s.deleteServiceInstanceErr
 }
+
+type mockUsers struct {
+	users           []*resource.User
+	listAllUsersErr error
+}
+
+func (u *mockUsers) ListAll(ctx context.Context, opts *client.UserListOptions) ([]*resource.User, error) {
+	return u.users, u.listAllUsersErr
+}
