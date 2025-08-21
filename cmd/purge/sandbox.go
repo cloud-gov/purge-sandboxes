@@ -66,9 +66,9 @@ func listSpaceDevsAndManagers(
 				usernamesMap = make(map[string]string)
 			}
 			for _, spaceUser := range spaceUsers {
-				if spaceUser.GUID == roleUserGUID {
-					usernamesMap[roleUserGUID] = *spaceUser.Username
-					username = usernamesMap[roleUserGUID]
+				if spaceUser.GUID == roleUserGUID && spaceUser.Username != nil {
+					username = *spaceUser.Username
+					usernamesMap[roleUserGUID] = username
 				}
 			}
 		}

@@ -187,7 +187,7 @@ func TestListSpaceDevsAndManagers(t *testing.T) {
 			},
 			expectedManagers: []spaceUser{},
 		},
-		"skips users without username": {
+		"skips users that cannot be looked up from space users": {
 			userGUIDs: map[string]bool{
 				"user-1": true,
 				"user-2": true,
@@ -226,6 +226,30 @@ func TestListSpaceDevsAndManagers(t *testing.T) {
 					Username: email1,
 				},
 			},
+			expectedManagers: []spaceUser{},
+		},
+		"handlers users with no username": {
+			userGUIDs: map[string]bool{
+				"user-1": true,
+			},
+			users: []*resource.User{
+				{
+					Resource: resource.Resource{GUID: "user-1"},
+				},
+			},
+			roles: []*resource.Role{
+				{
+					Type: "space_developer",
+					Relationships: resource.RoleSpaceUserOrganizationRelationships{
+						User: resource.ToOneRelationship{
+							Data: &resource.Relationship{
+								GUID: "user-1",
+							},
+						},
+					},
+				},
+			},
+			expectedDevs:     []spaceUser{},
 			expectedManagers: []spaceUser{},
 		},
 	}

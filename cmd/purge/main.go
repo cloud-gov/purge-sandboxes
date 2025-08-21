@@ -56,7 +56,7 @@ func main() {
 	}
 	userGUIDs := map[string]bool{}
 	for _, user := range users {
-		if strings.Contains(*user.Username, "@") {
+		if user.Username != nil && strings.Contains(*user.Username, "@") {
 			userGUIDs[user.GUID] = true
 		}
 	}
