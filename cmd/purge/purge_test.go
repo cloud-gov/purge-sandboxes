@@ -70,6 +70,7 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 		organization            *resource.Organization
 		spaceDetails            SpaceDetails
 		expectSpaceCreatedRoles []spaceCreatedRole
+		expectErr               bool
 	}{
 		"success with one org manager": {
 			cfClient: &cfResourceClient{
@@ -467,6 +468,119 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 				},
 			},
 		},
+		"returns error from listing user roles": {
+			cfClient: &cfResourceClient{
+				Roles: &mockRoles{
+					listRolesErr: errors.New("error listing users"),
+				},
+			},
+			userGUIDs: map[string]bool{
+				"user-1": true,
+			},
+			options: Options{
+				DryRun: false,
+			},
+			spaceDetails: SpaceDetails{
+				Space: &resource.Space{
+					Resource: resource.Resource{
+						GUID: "space-1-guid",
+					},
+				},
+			},
+			expectErr: true,
+		},
+		"returns error from listing recipients": {
+			cfClient: &cfResourceClient{
+				Applications: &mockApplications{},
+				Roles: &mockRoles{
+					spaceGUID: "space-1-guid",
+					roles: []*resource.Role{
+						{
+							Type: resource.SpaceRoleManager.String(),
+							Relationships: resource.RoleSpaceUserOrganizationRelationships{
+								Space: resource.ToOneRelationship{
+									Data: &resource.Relationship{
+										GUID: "space-1-guid",
+									},
+								},
+								User: resource.ToOneRelationship{
+									Data: &resource.Relationship{
+										GUID: "user-1",
+									},
+								},
+							},
+						},
+					},
+					users: []*resource.User{
+						{
+							Resource: resource.Resource{
+								GUID: "user-1",
+							},
+						},
+					},
+				},
+			},
+			userGUIDs: map[string]bool{
+				"user-1": true,
+			},
+			options: Options{
+				DryRun: false,
+			},
+			spaceDetails: SpaceDetails{
+				Space: &resource.Space{
+					Resource: resource.Resource{
+						GUID: "space-1-guid",
+					},
+				},
+			},
+			expectErr: true,
+		},
+		"returns nil for dry run": {
+			cfClient: &cfResourceClient{
+				Applications: &mockApplications{},
+				Roles: &mockRoles{
+					spaceGUID: "space-1-guid",
+					roles: []*resource.Role{
+						{
+							Type: resource.SpaceRoleManager.String(),
+							Relationships: resource.RoleSpaceUserOrganizationRelationships{
+								Space: resource.ToOneRelationship{
+									Data: &resource.Relationship{
+										GUID: "space-1-guid",
+									},
+								},
+								User: resource.ToOneRelationship{
+									Data: &resource.Relationship{
+										GUID: "user-1",
+									},
+								},
+							},
+						},
+					},
+					users: []*resource.User{
+						{
+							Resource: resource.Resource{
+								GUID: "user-1",
+							},
+							Username: &email,
+						},
+					},
+				},
+			},
+			userGUIDs: map[string]bool{
+				"user-1": true,
+			},
+			options: Options{
+				DryRun: true,
+			},
+			spaceDetails: SpaceDetails{
+				Space: &resource.Space{
+					Resource: resource.Resource{
+						GUID: "space-1-guid",
+					},
+				},
+			},
+		},
 	}
 
 	for name, test := range testCases {
@@ -481,7 +595,7 @@ func TestPurgeAndRecreateSpace(t *testing.T) {
 				&mockMailSender{},
 			)
 
-			if err != nil {
+			if err != nil && !test.expectErr {
 				t.Fatal(err)
 			}
 
