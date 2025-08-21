@@ -50,15 +50,9 @@ func main() {
 	}
 
 	// Build filter of users with email addresses (not service accounts)
-	users, err := cfClient.Users.ListAll(ctx, nil)
+	userGUIDs, err := getValidUsersMap(ctx, cfClient)
 	if err != nil {
 		log.Fatalf("error getting users: %s", err.Error())
-	}
-	userGUIDs := map[string]bool{}
-	for _, user := range users {
-		if strings.Contains(*user.Username, "@") {
-			userGUIDs[user.GUID] = true
-		}
 	}
 
 	now := time.Now().Truncate(24 * time.Hour)
